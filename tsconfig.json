@@ -1,5 +1,6 @@
 {
   "include": ["server/**/*.ts", "ui/**/*.ts"],
+  "exclude": ["node_modules", "dist", "example-receiver/**"],
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     // File Layout

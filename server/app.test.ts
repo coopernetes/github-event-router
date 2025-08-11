@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { startServer } from "./app.js";
 import { loadConfig, setAppConfig } from "./config.js";
-import type { ServerConfig } from "./config.js";
+import type { Config } from "./config.js";
 
 // Mock the config module
 vi.mock("./config.js", () => ({
@@ -16,20 +16,31 @@ describe("startServer", () => {
   });
 
   test("logs correct server information", () => {
-    const testConfig: ServerConfig = {
+    const testConfig: Config = {
       app: {
         id: 123,
-        client_id: "test-client",
-        client_secret: "test-secret",
         webhook_secret: "test-webhook",
         private_key: "test-key",
       },
-      receivers: [
+      subscribers: [
         {
-          url: "http://localhost/webhook",
-          webhook_secret: "receiver-secret",
+          id: 1,
+          name: 'foo',
+          events: [],
+          transport: {
+            id: 1,
+            name: 'https',
+            config: {
+              webhook_secret: "receiver-webhook",
+              url: "http://localhost/webhook",
+            },
+          },
         },
       ],
+      server: {
+        port: 3000,
+      },
+      database: undefined,
     };
 
     // Mock loadConfig to return our test config
