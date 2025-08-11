@@ -1,11 +1,19 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { loadConfig } from "./config.js";
-import { get } from "config";
 
 // Mock the config module
-vi.mock("config", () => ({
-  get: vi.fn(),
-}));
+vi.mock("config", () => {
+  return {
+    default: {
+      get: vi.fn(),
+    },
+  };
+});
+
+// Import the mocked module with correct typing
+import type { IConfig } from "config";
+const config = (await import("config")) as unknown as { default: IConfig };
 
 describe("loadConfig", () => {
   beforeEach(() => {
@@ -13,8 +21,8 @@ describe("loadConfig", () => {
   });
 
   test("returns default values when no config is set", () => {
-    const config = loadConfig();
-    expect(config).toEqual({
+    const loadedConfig = loadConfig();
+    expect(loadedConfig).toEqual({
       app: {
         id: 1,
         client_id: "<your_client_id>",
@@ -35,11 +43,13 @@ describe("loadConfig", () => {
       "app.private_key": "test-key",
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (get as any).mockImplementation((key: string) => mockConfig[key]);
+    // Use Mock from Vitest instead of jest.Mock
+    (config.default.get as Mock).mockImplementation(
+      (key: string) => mockConfig[key]
+    );
 
-    const config = loadConfig();
-    expect(config).toEqual({
+    const loadedConfig = loadConfig();
+    expect(loadedConfig).toEqual({
       app: {
         id: 123,
         client_id: "test-client",
