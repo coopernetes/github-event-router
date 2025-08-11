@@ -1,0 +1,6 @@
+app:
+  id: 1 # appId
+  client_id: <your_client_id>
+  client_secret: <your_client_secret>
+  webhook_secret: <your_webhook_secret>
+  private_key: <your_private_key>
