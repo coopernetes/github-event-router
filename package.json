@@ -13,7 +13,8 @@
     "test:ci": "vitest run",
     "lint": "eslint .",
     "format:check": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "start": "node dist/index.js"
   },
   "author": "Thomas Cooper",
   "license": "Apache-2.0",

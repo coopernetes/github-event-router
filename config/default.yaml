@@ -4,3 +4,8 @@ app:
   client_secret: <your_client_secret>
   webhook_secret: <your_webhook_secret>
   private_key: <your_private_key>
+receivers:
+  - url: http://example.com/webhooks
+    webhook_secret: <your_webhook_secret>
+  - url: http://another-example.com/webhooks
+    webhook_secret: <your_webhook_secret>
