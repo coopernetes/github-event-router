@@ -1,5 +1,4 @@
 import config from "config";
-import type { Subscriber } from "./subscriber.js";
 
 export interface Config {
   server: {
@@ -10,7 +9,6 @@ export interface Config {
     private_key: string;
     webhook_secret: string;
   };
-  subscribers: Subscriber[];
   database: DatabaseConfig | undefined;
 }
 
@@ -49,7 +47,6 @@ export function loadConfig(): Config {
       private_key: config.get("app.private_key"),
       webhook_secret: config.get("app.webhook_secret"),
     },
-    subscribers: config.has('subscribers') ? config.get("subscribers") : [],
     database: config.get("database"),
   };
 }

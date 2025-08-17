@@ -22,21 +22,6 @@ describe("startServer", () => {
         webhook_secret: "test-webhook",
         private_key: "test-key",
       },
-      subscribers: [
-        {
-          id: 1,
-          name: 'foo',
-          events: [],
-          transport: {
-            id: 1,
-            name: 'https',
-            config: {
-              webhook_secret: "receiver-webhook",
-              url: "http://localhost/webhook",
-            },
-          },
-        },
-      ],
       server: {
         port: 3000,
       },

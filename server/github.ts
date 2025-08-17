@@ -49,7 +49,7 @@ export function setupWebhooks(app: Express): void {
   const config = getAppConfig();
 
   app.post(
-    "/webhook",
+    "/webhook/github",
     express.raw({ type: "application/json" }),
     async (req: Request, res: Response) => {
       const signature = req.header("x-hub-signature-256");
@@ -94,7 +94,6 @@ export function setupWebhooks(app: Express): void {
           subscriberPromises.push(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (async (): Promise<{ data: any; status: number }> => {
-              console.log(`DEBUG: subscriber ${JSON.stringify(subscriber)}`);
               const transportConfig = subscriber.transport
                 ?.config as HttpsTransportConfig;
               try {
@@ -114,9 +113,6 @@ export function setupWebhooks(app: Express): void {
                     transformRequest: [(data) => data],
                     timeout: 5000,
                   }
-                );
-                console.log(
-                  `Successfully notified subscriber ${subscriber.name} for event ${event}`
                 );
                 return Promise.resolve({
                   data: response.data,
@@ -146,7 +142,6 @@ export function setupWebhooks(app: Express): void {
       const responses = [];
       for (const result of subscriberResults) {
         if (result.status === "rejected") {
-          console.log(`DID A REJECTION`)
           parentStatus = 500;
           error = result.reason;
         }
@@ -169,10 +164,7 @@ export function setupWebhooks(app: Express): void {
   );
 
   app.use((req, res, next) => {
-    const payload = JSON.stringify(req.body);
-    const signature = req.headers["x-hub-signature-256"];
-    console.log("Received signature:", signature);
-    console.log("Payload:", payload);
+    // GitHub webhook middleware - signature verification could go here
     next();
   });
 }

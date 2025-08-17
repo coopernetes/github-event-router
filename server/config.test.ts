@@ -20,44 +20,43 @@ describe("loadConfig", () => {
     vi.resetAllMocks();
   });
 
-  test("returns default values when no config is set", () => {
-    const loadedConfig = loadConfig();
-    expect(loadedConfig).toEqual({
-      app: {
-        id: 1,
-        client_id: "<your_client_id>",
-        client_secret: "<your_client_secret>",
-        webhook_secret: "<your_webhook_secret>",
-        private_key: "<your_private_key>",
-      },
-      receivers: [],
-    });
-  });
-
-  test("returns custom values when config is set", () => {
-    const mockConfig: { [key: string]: number | string } = {
-      "app.id": 123,
-      "app.client_id": "test-client",
-      "app.client_secret": "test-secret",
-      "app.webhook_secret": "test-webhook",
-      "app.private_key": "test-key",
+  test("loads configuration correctly", () => {
+    const mockGet = (key: string): unknown => {
+      switch (key) {
+        case "server.port":
+          return 8080;
+        case "app.id":
+          return 123;
+        case "app.webhook_secret":
+          return "test-webhook";
+        case "app.private_key":
+          return "test-key";
+        case "database":
+          return {
+            type: "sqlite",
+            filename: ":memory:",
+          };
+        default:
+          return undefined;
+      }
     };
 
-    // Use Mock from Vitest instead of jest.Mock
-    (config.default.get as Mock).mockImplementation(
-      (key: string) => mockConfig[key]
-    );
+    (config.default.get as Mock).mockImplementation(mockGet);
 
     const loadedConfig = loadConfig();
     expect(loadedConfig).toEqual({
+      server: {
+        port: 8080,
+      },
       app: {
         id: 123,
-        client_id: "test-client",
-        client_secret: "test-secret",
         webhook_secret: "test-webhook",
         private_key: "test-key",
       },
-      receivers: [],
+      database: {
+        type: "sqlite",
+        filename: ":memory:",
+      },
     });
   });
 });

@@ -1,4 +1,3 @@
-import { getAppConfig } from "./config.js";
 import Database, { type Database as DatabaseType } from "better-sqlite3";
 
 export interface Subscriber {
@@ -40,17 +39,60 @@ class SubscriberService {
   private _subscribers: Subscriber[] | null = null;
   private _db: DatabaseType | null = null;
 
-  private constructor() {
-    const config = getAppConfig();
-    if (config.database?.type === "sqlite") {
-      this._db = new Database(config.database.filename);
-      this._db.pragma("journal_mode = WAL");
-    }
+  private constructor(dbPath: string) {
+    this._db = new Database(dbPath);
+    this._db.pragma("journal_mode = WAL");
   }
 
-  static getInstance(): SubscriberService {
+  private normalizeSubscriber(raw: {
+    id?: number;
+    name: string;
+    events: string | string[];
+    transport?: {
+      id?: number;
+      name: string;
+      config: string | Record<string, unknown>;
+    };
+  }): Subscriber {
+    // Ensure events is always an array
+    const events =
+      typeof raw.events === "string"
+        ? raw.events.split(",").map((e) => e.trim())
+        : Array.isArray(raw.events)
+          ? raw.events
+          : [];
+
+    if (!raw.name || events.length === 0) {
+      throw new Error("Invalid subscriber data: name and events are required");
+    }
+
+    // Normalize transport name (convert 'http' to 'https')
+    const transportName =
+      raw.transport?.name === "http" ? "https" : raw.transport?.name;
+    if (transportName && !["https", "redis"].includes(transportName)) {
+      throw new Error(`Invalid transport type: ${transportName}`);
+    }
+
+    return {
+      id: raw.id ?? 0, // Use 0 for new subscribers
+      name: raw.name,
+      events,
+      transport: raw.transport
+        ? {
+            id: raw.transport.id ?? 0,
+            name: transportName as TransportName,
+            config:
+              typeof raw.transport.config === "string"
+                ? JSON.parse(raw.transport.config)
+                : raw.transport.config,
+          }
+        : undefined,
+    };
+  }
+
+  static getInstance(dbPath = "./database.sqlite"): SubscriberService {
     if (!SubscriberService._instance) {
-      SubscriberService._instance = new SubscriberService();
+      SubscriberService._instance = new SubscriberService(dbPath);
     }
     return SubscriberService._instance;
   }
@@ -74,37 +116,58 @@ class SubscriberService {
     const subscriberRows = this.db
       .prepare("SELECT id, name, events FROM subscribers")
       .all();
-    for (const subRow of subscriberRows) {
-      console.log(`DEBUG: subRow ${JSON.stringify(subRow)}`);
-      const subscriber = subRow as Subscriber;
+
+    for (const row of subscriberRows) {
+      const subRow = row as { id: number; name: string; events: string };
+
+      // Get transport data
       const transportResult = this.db
         .prepare(
           "SELECT id, name, config FROM transports WHERE subscriber_id = ?"
         )
-        .get(subscriber.id);
-      console.log(`DEBUG: transportResult ${JSON.stringify(transportResult)}`);
-      if (!transportResult) {
-        console.warn(`No transport found for subscriber ${subscriber.id}`);
-      } else {
-        const transportRow = transportResult as TransportRow;
-        const config = this.configType(JSON.parse(transportRow.config));
-        subscriber.transport = {
-          id: transportRow.id,
-          name: transportRow.name,
-          config,
+        .get(subRow.id);
+
+      // Normalize the raw data from database
+      const rawSubscriber: {
+        id: number;
+        name: string;
+        events: string;
+        transport?: {
+          id: number;
+          name: string;
+          config: string;
         };
+      } = {
+        id: subRow.id,
+        name: subRow.name,
+        events: subRow.events, // This will be normalized by normalizeSubscriber
+      };
+
+      if (transportResult) {
+        const transport = transportResult as {
+          id: number;
+          name: string;
+          config: string;
+        };
+        rawSubscriber.transport = transport;
       }
-      subscribers.push(subscriber);
+
+      try {
+        const subscriber = this.normalizeSubscriber(rawSubscriber);
+        subscribers.push(subscriber);
+      } catch (error) {
+        console.error(`Error normalizing subscriber ${subRow.id}:`, error);
+        // Skip this subscriber if normalization fails
+        continue;
+      }
     }
     return subscribers;
   }
 
   public getSubscribers(): Subscriber[] {
-    if (this._subscribers) {
-      return this._subscribers;
+    if (this._subscribers === null) {
+      this._subscribers = this.fetchSubscribers();
     }
-    const config = getAppConfig();
-    this._subscribers = config.subscribers.concat(this.fetchSubscribers());
     return this._subscribers;
   }
 
@@ -173,7 +236,11 @@ class SubscriberService {
         }
         if (updates.events) {
           sets.push("events = ?");
-          params.push(JSON.stringify(updates.events));
+          // Convert array to comma-separated string for database storage
+          const eventsString = Array.isArray(updates.events)
+            ? updates.events.join(",")
+            : updates.events;
+          params.push(eventsString);
         }
         params.push(id);
 
@@ -181,18 +248,37 @@ class SubscriberService {
         this.db.prepare(updateQuery).run(...params);
       }
 
-      // Update transport if provided
+      // Update or insert transport if provided
       if (updates.transport) {
-        const transportStmt = this.db.prepare(`
-          UPDATE transports 
-          SET name = ?, config = ?
-          WHERE subscriber_id = ?
-        `);
-        transportStmt.run(
-          updates.transport.name,
-          JSON.stringify(updates.transport.config),
-          id
-        );
+        // Check if transport already exists
+        const existingTransport = this.db
+          .prepare("SELECT id FROM transports WHERE subscriber_id = ?")
+          .get(id);
+
+        if (existingTransport) {
+          // Update existing transport
+          const transportStmt = this.db.prepare(`
+            UPDATE transports 
+            SET name = ?, config = ?
+            WHERE subscriber_id = ?
+          `);
+          transportStmt.run(
+            updates.transport.name,
+            JSON.stringify(updates.transport.config),
+            id
+          );
+        } else {
+          // Insert new transport
+          const transportStmt = this.db.prepare(`
+            INSERT INTO transports (subscriber_id, name, config)
+            VALUES (?, ?, ?)
+          `);
+          transportStmt.run(
+            id,
+            updates.transport.name,
+            JSON.stringify(updates.transport.config)
+          );
+        }
       }
 
       // Fetch and return updated subscriber

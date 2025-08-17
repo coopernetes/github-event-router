@@ -1,17 +1,28 @@
 import express from "express";
 import { loadConfig, setAppConfig } from "./config.js";
-import { setupWebhooks } from "./github.js";
+import { router as apiRoutes } from "./routes.js";
 
 export function startServer() {
+  const app = express();
   const config = loadConfig();
   setAppConfig(config);
-  const app = express();
-  setupWebhooks(app);
 
-  console.log(`App ID: ${config.app.id}`);
-  console.log(`Webhook Secret: ${config.app.webhook_secret}`);
-  
-  app.listen(config.server.port, () => {
-    console.log(`Server is listening on port ${config.server.port}`);
+  // Parse JSON for all routes
+  app.use(express.json());
+
+  // Simple test route at root
+  app.get("/", (req, res) => {
+    res.json({ message: "Server is running" });
+  });
+
+  // API Routes
+  app.use("/api/v1", apiRoutes);
+
+  // Start the server
+  const port = config.server.port || 8080;
+  app.listen(port, () => {
+    console.log(`App ID: ${config.app.id}`);
+    console.log(`Webhook Secret: ${config.app.webhook_secret}`);
+    console.log(`Server is running on port ${port}`);
   });
 }

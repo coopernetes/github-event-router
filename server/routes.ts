@@ -56,16 +56,26 @@ function isValidEvents(events: unknown): events is string[] {
 
 export const router = Router();
 
-router.get("/api/v1/readiness", (req, res) => {
+// Test route
+router.get("/test", (req, res) => {
+  res.json({ message: "Router is working" });
+});
+
+router.get("/readiness", (req, res) => {
   res.json({ ready: "up" });
 });
 
-router.get("/api/v1/liveness", (req, res) => {
+router.get("/liveness", (req, res) => {
   res.json({ status: "up" });
 });
 
-router.get("/api/v1/subscribers", (req, res) => {
+router.get("/subscribers", (req, res) => {
   try {
+    // Add no-cache headers to prevent stale data issues during development
+    res.set("Cache-Control", "no-store");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+
     const subscribers = getSubscribers();
     res.json(subscribers);
   } catch (error) {
@@ -75,7 +85,7 @@ router.get("/api/v1/subscribers", (req, res) => {
 });
 
 // Create new subscriber
-router.post("/api/v1/subscribers", (req, res) => {
+router.post("/subscribers", (req, res) => {
   try {
     const { name, events, transport } = req.body;
 
@@ -111,7 +121,7 @@ router.post("/api/v1/subscribers", (req, res) => {
 });
 
 // Update existing subscriber
-router.put("/api/v1/subscribers/:id", (req, res) => {
+router.put("/subscribers/:id", (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -157,7 +167,7 @@ router.put("/api/v1/subscribers/:id", (req, res) => {
 });
 
 // Delete subscriber
-router.delete("/api/v1/subscribers/:id", (req, res) => {
+router.delete("/subscribers/:id", (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {

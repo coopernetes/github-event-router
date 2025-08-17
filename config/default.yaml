@@ -5,17 +5,6 @@ app:
   private_key: <your_private_key>
   webhook_secret: foobarbaz123
 
-subscribers:
-  - name: foo
-    transport:
-      name: https
-      config:
-        url: http://localhost:3000/api/github/webhooks
-        webhook_secret: bazqux123456
-    events:
-    - push
-    - pull_request
-
 database:
   type: sqlite
   filename: ./database.sqlite
