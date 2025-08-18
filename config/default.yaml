@@ -6,6 +6,7 @@ app:
   webhook_secret: foobarbaz123
 
 database:
+  encryption_key: super_s3cret
   type: sqlite
   filename: ./database.sqlite
 

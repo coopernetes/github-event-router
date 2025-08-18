@@ -3,6 +3,7 @@ import { type Config } from "./config.js";
 import { type GitHubEvent, TransportFactory } from "./transport.js";
 import { RetryHandler, type RetryContext } from "./retry.js";
 import { getSubscribers, type Subscriber } from "./subscriber.js";
+import { encryptHeaders, decryptHeaders } from "./encryption.js";
 import crypto from "crypto";
 
 export interface EventProcessingResult {
@@ -206,7 +207,8 @@ export class EventProcessor {
 
   private async storeEvent(event: GitHubEvent): Promise<number> {
     const payloadString = JSON.stringify(event.payload);
-    const headersString = JSON.stringify(event.headers);
+    // Encrypt headers to protect sensitive information like webhook signatures
+    const encryptedHeaders = encryptHeaders(event.headers);
     const payloadHash = crypto
       .createHash("sha256")
       .update(payloadString)
@@ -223,7 +225,7 @@ export class EventProcessor {
       payloadHash,
       Buffer.from(payloadString).length,
       payloadString,
-      headersString,
+      encryptedHeaders,
       event.receivedAt.toISOString(),
       "pending"
     );
@@ -384,22 +386,20 @@ export class EventProcessor {
       return;
     }
 
-    // Parse the original payload and headers
+    // Parse the original payload and decrypt headers (contains sensitive webhook signatures)
     let originalPayload: Record<string, unknown>;
     let originalHeaders: Record<string, string>;
 
     try {
       originalPayload = JSON.parse(retry.payload_data);
-      originalHeaders = JSON.parse(retry.headers_data);
+      originalHeaders = decryptHeaders(retry.headers_data);
     } catch (error) {
       console.error(
         `Failed to parse stored payload/headers for event ${retry.github_delivery_id}:`,
         error
       );
       return;
-    }
-
-    // Create the retry event with original payload and headers
+    } // Create the retry event with original payload and headers
     const retryEvent: GitHubEvent = {
       id: retry.github_delivery_id,
       type: retry.event_type,

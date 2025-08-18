@@ -19,6 +19,7 @@ export type DatabaseType = "sqlite" | "postgres";
 
 export interface DatabaseConfig {
   type: DatabaseType;
+  encryption_key: string;
   filename?: string;
   host?: string;
   port?: number;

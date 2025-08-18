@@ -20,7 +20,7 @@
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
     "start": "NODE_ENV=production node --enable-source-maps dist/server/index.js",
-    "db:reset": "rm -f database.sqlite* && sqlite3 database.sqlite < migrations/sqlite/001_create_tables.sql && sqlite3 database.sqlite < migrations/sqlite/002_examples.sql && sqlite3 database.sqlite < migrations/sqlite/003_event_tracking.sql"
+    "db:reset": "rm -f database.sqlite* && sqlite3 database.sqlite < migrations/sqlite/001_create_tables.sql && sqlite3 database.sqlite < migrations/sqlite/002_examples.sql && sqlite3 database.sqlite < migrations/sqlite/003_event_tracking.sql && sqlite3 database.sqlite < migrations/sqlite/004_store_payload_headers.sql"
   },
   "author": "Thomas Cooper",
   "license": "Apache-2.0",
