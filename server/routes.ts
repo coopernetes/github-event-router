@@ -9,6 +9,19 @@ import {
   type HttpsTransportConfig,
   type RedisTransportConfig,
 } from "./subscriber.js";
+import { HealthMonitor } from "./health-monitor.js";
+import { getAppConfig } from "./config.js";
+
+// Health monitor will be initialized lazily
+let healthMonitor: HealthMonitor | null = null;
+
+function getHealthMonitor(): HealthMonitor {
+  if (!healthMonitor) {
+    const config = getAppConfig();
+    healthMonitor = new HealthMonitor(config);
+  }
+  return healthMonitor;
+}
 
 // Type guards for validation
 type UnknownConfig = {
@@ -61,8 +74,23 @@ router.get("/test", (req, res) => {
   res.json({ message: "Router is working" });
 });
 
-router.get("/readiness", (req, res) => {
-  res.json({ ready: "up" });
+router.get("/readiness", async (req, res) => {
+  try {
+    const monitor = getHealthMonitor();
+    const health = await monitor.getSystemHealth();
+    const isHealthy = monitor.isHealthy();
+
+    res.status(isHealthy ? 200 : 503).json({
+      ready: isHealthy ? "up" : "degraded",
+      health,
+      summary: monitor.getHealthSummary(),
+    });
+  } catch (error) {
+    res.status(503).json({
+      ready: "down",
+      error: error instanceof Error ? error.message : "Health check failed",
+    });
+  }
 });
 
 router.get("/liveness", (req, res) => {

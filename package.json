@@ -12,7 +12,7 @@
     "build:server": "tsc",
     "build:ui": "cd ui && npm run build",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:ui\"",
-    "dev:server": "concurrently \"tsc --watch\" \"nodemon --watch dist dist/server/index.js\"",
+    "dev:server": "concurrently \"tsc --watch\" \"nodemon --watch dist --exec 'node --enable-source-maps' dist/server/index.js\"",
     "dev:ui": "cd ui && npm run dev",
     "test": "vitest",
     "test:ci": "vitest run --coverage",
@@ -20,24 +20,26 @@
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
     "start": "NODE_ENV=production node --enable-source-maps dist/server/index.js",
-    "db:reset": "rm -f database.sqlite* && sqlite3 database.sqlite < migrations/sqlite/001_create_tables.sql && sqlite3 database.sqlite < migrations/sqlite/002_examples.sql"
+    "db:reset": "rm -f database.sqlite* && sqlite3 database.sqlite < migrations/sqlite/001_create_tables.sql && sqlite3 database.sqlite < migrations/sqlite/002_examples.sql && sqlite3 database.sqlite < migrations/sqlite/003_event_tracking.sql"
   },
   "author": "Thomas Cooper",
   "license": "Apache-2.0",
   "dependencies": {
+    "@types/redis": "^4.0.10",
     "axios": "^1.11.0",
     "better-sqlite3": "^12.2.0",
     "config": "^4.1.0",
     "express": "^5.1.0",
-    "octokit": "^5.0.3"
+    "octokit": "^5.0.3",
+    "redis": "^5.8.1"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
     "@eslint/js": "^9.33.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/config": "^3.3.5",
     "@types/express": "^5.0.3",
     "@vitest/coverage-v8": "^3.2.4",
+    "concurrently": "^8.2.2",
     "eslint": "^9.33.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",

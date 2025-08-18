@@ -9,7 +9,7 @@ if (!webhookSecret) {
 }
 
 // Sample push event payload
-const payload = JSON.stringify(
+const payloadPretty = JSON.stringify(
   {
     ref: "refs/heads/main",
     before: "6113728f27ae82c7b1a177c8d03f9e96e0adf246",
@@ -44,6 +44,8 @@ const payload = JSON.stringify(
   2
 );
 
+const payload = JSON.stringify(JSON.parse(payloadPretty));
+
 // Generate headers
 const signature = crypto
   .createHmac("sha256", webhookSecret)
@@ -61,12 +63,12 @@ const headers = {
 
 console.log("=== Sending Webhook ===");
 console.log("Headers:", headers);
-console.log("Payload:", payload);
+console.log("Payload:", payloadPretty);
 
 const options = {
   hostname: "localhost",
   port: 8080,
-  path: "/webhook",
+  path: "/webhook/github",
   method: "POST",
   headers,
 };

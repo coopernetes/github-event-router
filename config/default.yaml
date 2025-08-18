@@ -8,3 +8,30 @@ app:
 database:
   type: sqlite
   filename: ./database.sqlite
+
+event_processing:
+  retry:
+    max_attempts: 3
+    backoff_strategy: exponential
+    initial_delay_ms: 1000
+    max_delay_ms: 30000
+    retryable_status_codes: [500, 502, 503, 504, 408, 429]
+
+  timeouts:
+    http_delivery_timeout_ms: 10000
+    redis_delivery_timeout_ms: 5000
+
+  queue:
+    batch_size: 10
+    processing_interval_ms: 1000
+    dead_letter_threshold: 5
+
+monitoring:
+  enable_metrics: true
+  log_level: info
+  failed_delivery_alerts: true
+
+security:
+  enable_rate_limiting: true
+  requests_per_minute: 1000
+  payload_size_limit_mb: 10

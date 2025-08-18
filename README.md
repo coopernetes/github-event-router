@@ -4,6 +4,15 @@ A GitHub App that acts as a central receiver of GitHub events of any kind and al
 
 The need for this project was born out of large-scale GitHub Enterprise Server environments. However, it can be deployed to any large GitHub organization and does not require GitHub Enterprise directly.
 
+## Goals
+
+- Efficiently aggregate GitHub events & distribute across multiple downstream "subscribers"
+- Retries on failures
+- Error handling that is configurable
+- UI & CLI to register new GitHub Apps
+- Allow subscribers to use existing tooling such as [Probot](https://probot.github.io/) and reuse webhook secrets for authentication
+- Supports subscribers of events over HTTP (TLS), pubsub or queues
+
 ## Usage
 
 1. **Install the GitHub Event Router App** in your organization. This is done like any other GitHub App. See [GitHub's documentation for instructions]().
@@ -13,20 +22,40 @@ The need for this project was born out of large-scale GitHub Enterprise Server e
 
 ## Architecture
 
-- **Central Receiver:** The app receives all GitHub webhook events for your organization.
-- **Event Filtering:** Events are filtered and routed based on downstream app subscriptions.
-- **Downstream Delivery:** Events are forwarded to registered endpoints via HTTP POST.
-- **Scalability:** Designed to handle high event throughput and multiple downstream consumers.
+The GitHub Event Router uses a robust, scalable architecture designed for enterprise environments:
+
+### Core Components
+
+- **Central Receiver:** Receives all GitHub webhook events with security validation and rate limiting
+- **Event Processing Engine:** Queues, processes, and tracks all events with configurable retry mechanisms
+- **Transport Layer:** Pluggable delivery system supporting HTTPS and Redis pub/sub
+- **Health Monitoring:** Comprehensive system health monitoring with metrics and alerting
+- **Persistent Storage:** Event audit trail and delivery tracking for reliability and debugging
+
+### Event Flow
 
 ```
-GitHub
-   |
-   v
-[Event Router App]
-   |         \
-   v          v
-[App A]    [App B]
+GitHub Webhook
+      ↓
+[Security Validation]
+      ↓
+[Event Storage & Queuing]
+      ↓
+[Subscriber Matching]
+      ↓
+[Transport Delivery] → [Retry Logic] → [Dead Letter Queue]
+      ↓
+[Audit & Monitoring]
 ```
+
+### Key Features
+
+- **Configurable Retry Logic:** Exponential/linear backoff with customizable retry policies
+- **Event Auditing:** Complete audit trail of all events and delivery attempts
+- **Health Monitoring:** Real-time system health with comprehensive metrics
+- **Security:** Rate limiting, IP whitelisting, payload validation, and signature verification
+- **Transport Flexibility:** Support for HTTPS webhooks and Redis pub/sub with pluggable architecture
+- **Scalability:** Designed for high-throughput GitHub Enterprise environments
 
 ## Development
 
