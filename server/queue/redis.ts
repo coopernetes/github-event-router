@@ -150,7 +150,7 @@ export class RedisQueue implements IQueue {
       for (const stream of messages) {
         for (const msg of stream.messages) {
           const messageDataStr = msg.message.data;
-          if (typeof messageDataStr !== 'string') {
+          if (typeof messageDataStr !== "string") {
             continue;
           }
           const messageData = JSON.parse(messageDataStr);

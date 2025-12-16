@@ -27,10 +27,7 @@ export class RedisTransport implements ITransport {
   validateConfig(config: unknown): config is RedisTransportConfig {
     if (!config || typeof config !== "object") return false;
     const redisConfig = config as RedisTransportConfig;
-    return (
-      typeof redisConfig.url === "string" &&
-      typeof redisConfig.password === "string"
-    );
+    return typeof redisConfig.url === "string";
   }
 
   async deliver(
