@@ -1,7 +1,7 @@
 /**
  * AMQP (RabbitMQ) transport for delivering events to subscribers
  */
-import amqp, { type Connection, type Channel } from "amqplib";
+import * as amqplib from "amqplib";
 import type { Config } from "../config.js";
 import type {
   ITransport,
@@ -12,8 +12,8 @@ import type {
 } from "./interface.js";
 
 interface AMQPConnection {
-  connection: Connection;
-  channel: Channel;
+  connection: amqplib.ChannelModel;
+  channel: amqplib.Channel;
 }
 
 export class AMQPTransport implements ITransport {
@@ -58,7 +58,7 @@ export class AMQPTransport implements ITransport {
       let conn = this.connections.get(amqpConfig.url);
 
       if (!conn) {
-        const connection = await amqp.connect(amqpConfig.url);
+        const connection = await amqplib.connect(amqpConfig.url);
         const channel = await connection.createChannel();
 
         // If using exchange, assert it exists
@@ -70,6 +70,10 @@ export class AMQPTransport implements ITransport {
 
         conn = { connection, channel };
         this.connections.set(amqpConfig.url, conn);
+      }
+
+      if (!conn) {
+        throw new Error("Failed to create AMQP connection");
       }
 
       // Prepare message for AMQP
@@ -128,8 +132,16 @@ export class AMQPTransport implements ITransport {
   async close(): Promise<void> {
     // Close all AMQP connections
     for (const conn of this.connections.values()) {
-      await conn.channel.close();
-      await conn.connection.close();
+      try {
+        await conn.channel.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+      try {
+        await conn.connection.close();
+      } catch (e) {
+        // Ignore close errors
+      }
     }
     this.connections.clear();
   }

@@ -174,7 +174,7 @@ export class SQLiteDatabase implements IDatabase {
     where: Record<string, unknown>
   ): Promise<T | null> {
     const results = await this.find<T>(table, where, { limit: 1 });
-    return results.length > 0 ? results[0] : null;
+    return results.length > 0 && results[0] !== undefined ? results[0] : null;
   }
 
   async beginTransaction(): Promise<DatabaseTransaction> {

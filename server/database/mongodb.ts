@@ -127,9 +127,9 @@ export class MongoDBDatabase implements IDatabase {
 
     // Auto-generate sequential ID if not provided
     if (!data.id) {
-      const counters = this.getDb().collection("counters");
+      const counters = this.getDb().collection<{ _id: string; seq: number }>("counters");
       const counter = await counters.findOneAndUpdate(
-        { _id: table },
+        { _id: table as string },
         { $inc: { seq: 1 } },
         { upsert: true, returnDocument: "after" }
       );
@@ -182,8 +182,14 @@ export class MongoDBDatabase implements IDatabase {
     let cursor = collection.find(where || {});
 
     if (options?.orderBy) {
-      const [field, direction] = options.orderBy.split(" ");
-      cursor = cursor.sort({ [field]: direction === "DESC" ? -1 : 1 });
+      const parts = options.orderBy.split(" ");
+      const field = parts[0];
+      if (field) {
+        const direction = parts[1];
+        const sortOrder: Record<string, 1 | -1> = {};
+        sortOrder[field] = direction === "DESC" ? -1 : 1;
+        cursor = cursor.sort(sortOrder);
+      }
     }
 
     if (options?.offset) {

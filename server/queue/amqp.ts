@@ -1,7 +1,7 @@
 /**
  * AMQP (RabbitMQ) queue implementation
  */
-import amqp, { type Connection, type Channel, type Message } from "amqplib";
+import * as amqplib from "amqplib";
 import { randomUUID } from "crypto";
 import type { IQueue, QueueMessage, QueueOptions } from "./interface.js";
 
@@ -15,13 +15,13 @@ export interface AMQPQueueConfig {
 }
 
 export class AMQPQueue implements IQueue {
-  private connection: Connection | null = null;
-  private channel: Channel | null = null;
+  private connection: amqplib.ChannelModel | null = null;
+  private channel: amqplib.Channel | null = null;
   private config: AMQPQueueConfig;
   private options: QueueOptions;
   private connected = false;
   private consumerTag: string | null = null;
-  private pendingMessages: Map<string, Message> = new Map();
+  private pendingMessages: Map<string, amqplib.Message> = new Map();
 
   constructor(config: AMQPQueueConfig, options: QueueOptions = {}) {
     this.config = {
@@ -42,7 +42,7 @@ export class AMQPQueue implements IQueue {
   async connect(): Promise<void> {
     if (this.connected) return;
 
-    this.connection = await amqp.connect(this.config.url);
+    this.connection = await amqplib.connect(this.config.url);
     this.channel = await this.connection.createChannel();
 
     // Set prefetch for fair dispatch
@@ -104,7 +104,7 @@ export class AMQPQueue implements IQueue {
     return "amqp";
   }
 
-  private getChannel(): Channel {
+  private getChannel(): amqplib.Channel {
     if (!this.channel) {
       throw new Error("AMQP queue not connected");
     }

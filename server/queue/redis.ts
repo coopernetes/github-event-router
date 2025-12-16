@@ -39,10 +39,18 @@ export class RedisQueue implements IQueue {
   async connect(): Promise<void> {
     if (this.connected) return;
 
-    this.client = createClient({
+    const clientOptions: {
+      url: string;
+      password?: string;
+    } = {
       url: this.config.url,
-      password: this.config.password,
-    });
+    };
+
+    if (this.config.password) {
+      clientOptions.password = this.config.password;
+    }
+
+    this.client = createClient(clientOptions);
 
     await this.client.connect();
 
@@ -55,7 +63,7 @@ export class RedisQueue implements IQueue {
       // Group might already exist, ignore error
       const err = error as Error;
       if (!err.message?.includes("BUSYGROUP")) {
-        console.warn("Error creating consumer group:", err.message);
+        console.warn("Error creating consumer group:", err.message || "Unknown error");
       }
     }
 
@@ -141,7 +149,11 @@ export class RedisQueue implements IQueue {
 
       for (const stream of messages) {
         for (const msg of stream.messages) {
-          const messageData = JSON.parse(msg.message.data);
+          const messageDataStr = msg.message.data;
+          if (typeof messageDataStr !== 'string') {
+            continue;
+          }
+          const messageData = JSON.parse(messageDataStr);
 
           // Check if message is delayed
           if (messageData.delayUntil) {

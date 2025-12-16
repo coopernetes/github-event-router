@@ -55,12 +55,31 @@ export class KafkaTransport implements ITransport {
       let producer = this.producers.get(brokerKey);
 
       if (!producer) {
-        const kafka = new Kafka({
+        const kafkaInitConfig: {
+          clientId: string;
+          brokers: string[];
+          ssl?: boolean;
+          sasl?:
+            | { mechanism: "plain"; username: string; password: string }
+            | { mechanism: "scram-sha-256"; username: string; password: string }
+            | { mechanism: "scram-sha-512"; username: string; password: string };
+        } = {
           clientId: kafkaConfig.clientId || "github-event-router-subscriber",
           brokers: kafkaConfig.brokers,
-          ssl: kafkaConfig.ssl,
-          sasl: kafkaConfig.sasl,
-        });
+        };
+
+        if (kafkaConfig.ssl !== undefined) {
+          kafkaInitConfig.ssl = kafkaConfig.ssl;
+        }
+
+        if (kafkaConfig.sasl) {
+          kafkaInitConfig.sasl = kafkaConfig.sasl as
+            | { mechanism: "plain"; username: string; password: string }
+            | { mechanism: "scram-sha-256"; username: string; password: string }
+            | { mechanism: "scram-sha-512"; username: string; password: string };
+        }
+
+        const kafka = new Kafka(kafkaInitConfig);
 
         producer = kafka.producer();
         await producer.connect();

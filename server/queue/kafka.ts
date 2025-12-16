@@ -53,22 +53,24 @@ export class KafkaQueue implements IQueue {
       clientId: string;
       brokers: string[];
       ssl?: boolean;
-      sasl?: {
-        mechanism: "plain" | "scram-sha-256" | "scram-sha-512";
-        username: string;
-        password: string;
-      };
+      sasl?:
+        | { mechanism: "plain"; username: string; password: string }
+        | { mechanism: "scram-sha-256"; username: string; password: string }
+        | { mechanism: "scram-sha-512"; username: string; password: string };
     } = {
       clientId: this.config.clientId!,
       brokers: this.config.brokers,
     };
 
-    if (this.config.ssl) {
+    if (this.config.ssl !== undefined) {
       kafkaConfig.ssl = this.config.ssl;
     }
 
     if (this.config.sasl) {
-      kafkaConfig.sasl = this.config.sasl;
+      kafkaConfig.sasl = this.config.sasl as
+        | { mechanism: "plain"; username: string; password: string }
+        | { mechanism: "scram-sha-256"; username: string; password: string }
+        | { mechanism: "scram-sha-512"; username: string; password: string };
     }
 
     this.kafka = new Kafka(kafkaConfig);

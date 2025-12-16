@@ -87,9 +87,9 @@ export class PostgreSQLDatabase implements IDatabase {
     params: unknown[] = []
   ): Promise<QueryResult<T>> {
     const pool = this.getPool();
-    const result: PgQueryResult<T> = await pool.query(sql, params);
+    const result = await pool.query(sql, params);
     return {
-      rows: result.rows,
+      rows: result.rows as T[],
       rowCount: result.rowCount || 0,
     };
   }
@@ -199,7 +199,7 @@ export class PostgreSQLDatabase implements IDatabase {
     where: Record<string, unknown>
   ): Promise<T | null> {
     const results = await this.find<T>(table, where, { limit: 1 });
-    return results.length > 0 ? results[0] : null;
+    return results.length > 0 && results[0] !== undefined ? results[0] : null;
   }
 
   async beginTransaction(): Promise<DatabaseTransaction> {

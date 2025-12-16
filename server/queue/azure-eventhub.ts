@@ -195,7 +195,10 @@ export class AzureEventHubQueue implements IQueue {
 
         // Update checkpoint
         if (events.length > 0) {
-          await context.updateCheckpoint(events[events.length - 1]);
+          const lastEvent = events[events.length - 1];
+          if (lastEvent) {
+            await context.updateCheckpoint(lastEvent);
+          }
         }
       },
       processError: async (error: Error) => {
