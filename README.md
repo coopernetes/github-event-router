@@ -1,90 +1,260 @@
 # GitHub Event Router - Scale GitHub Apps in your organization
 
-A GitHub App that acts as a central receiver of GitHub events of any kind and allows downstream Apps to subscribe to events. This helps large organizations scale their use of GitHub Apps and real-time integrations while keeping your GitHub Enterprise environment healthy & scalable.
-
-The need for this project was born out of large-scale GitHub Enterprise Server environments. However, it can be deployed to any large GitHub organization and does not require GitHub Enterprise directly.
+A highly scalable GitHub App that acts as a central receiver of GitHub events and distributes them to multiple downstream subscribers. Built for enterprise environments with 70,000+ repositories and 10,000+ developers.
 
 ## Goals
 
-- Efficiently aggregate GitHub events & distribute across multiple downstream "subscribers"
-- Retries on failures
-- Error handling that is configurable
-- UI & CLI to register new GitHub Apps
-- Allow subscribers to use existing tooling such as [Probot](https://probot.github.io/) and reuse webhook secrets for authentication
-- Supports subscribers of events over HTTP (TLS), pubsub or queues
-
-## Usage
-
-1. **Install the GitHub Event Router App** in your organization. This is done like any other GitHub App. See [GitHub's documentation for instructions]().
-2. **Configure downstream Apps** to subscribe to the events they need.
-3. **Set up event forwarding** using the provided configuration file or environment variables.
-4. **Monitor logs** to ensure events are being routed as expected.
+- **Horizontally Scalable**: Add router instances and workers as needed
+- **Multiple Database Support**: SQLite, PostgreSQL, MongoDB
+- **Multiple Queue Systems**: Memory, Redis, Kafka, AWS SQS, Azure Event Hub, AMQP
+- **Multiple Transport Protocols**: HTTPS, Redis Pub/Sub, Kafka, SQS, Event Hub, AMQP
+- **Enterprise-Grade**: Retries, error handling, audit trail, monitoring
+- **Easy Integration**: Compatible with existing tools like [Probot](https://probot.github.io/)
+- **Secure**: Webhook signature validation, encryption, rate limiting
 
 ## Architecture
 
-The GitHub Event Router uses a robust, scalable architecture designed for enterprise environments:
+The GitHub Event Router uses a robust, decoupled architecture designed for enterprise scalability:
 
 ### Core Components
 
-- **Central Receiver:** Receives all GitHub webhook events with security validation and rate limiting
-- **Event Processing Engine:** Queues, processes, and tracks all events with configurable retry mechanisms
-- **Transport Layer:** Pluggable delivery system supporting HTTPS and Redis pub/sub
-- **Health Monitoring:** Comprehensive system health monitoring with metrics and alerting
-- **Persistent Storage:** Event audit trail and delivery tracking for reliability and debugging
-
-### Event Flow
-
 ```
-GitHub Webhook
-      ↓
-[Security Validation]
-      ↓
-[Event Storage & Queuing]
-      ↓
-[Subscriber Matching]
-      ↓
-[Transport Delivery] → [Retry Logic] → [Dead Letter Queue]
-      ↓
-[Audit & Monitoring]
+GitHub → Router Instances → Internal Queue → Workers → Database
+                                  ↓
+                            Subscribers (via Transport Layer)
 ```
 
-### Key Features
+- **Router Instances (Receiver):** Stateless HTTP servers that receive webhooks, validate, and enqueue events
+- **Internal Queue:** Message queue for decoupling and horizontal scaling (Kafka, Redis, SQS, etc.)
+- **Workers (Processors):** Process events from queue and deliver to subscribers
+- **Database:** Store subscriber configuration, event audit, and delivery tracking (PostgreSQL, MongoDB, SQLite)
+- **Transport Layer:** Pluggable delivery system supporting multiple protocols
 
-- **Configurable Retry Logic:** Exponential/linear backoff with customizable retry policies
-- **Event Auditing:** Complete audit trail of all events and delivery attempts
-- **Health Monitoring:** Real-time system health with comprehensive metrics
-- **Security:** Rate limiting, IP whitelisting, payload validation, and signature verification
-- **Transport Flexibility:** Support for HTTPS webhooks and Redis pub/sub with pluggable architecture
-- **Scalability:** Designed for high-throughput GitHub Enterprise environments
+### Supported Technologies
 
-## Development
+#### Databases
+- **SQLite**: Development and small deployments
+- **PostgreSQL**: Production and enterprise (recommended)
+- **MongoDB**: Document-based storage option
 
-1. **Clone the repository:**
-   ```sh
-   git clone https://github.com/your-org/github-event-router.git
-   cd github-event-router
-   ```
-2. **Install dependencies:**
+#### Internal Queues
+- **Memory**: Development only
+- **Redis Streams**: Production, low latency
+- **Apache Kafka**: Enterprise, highest throughput (recommended)
+- **AWS SQS**: AWS-native deployments
+- **Azure Event Hub**: Azure-native deployments
+- **AMQP (RabbitMQ)**: Enterprise message bus integrations
+
+#### Subscriber Transports
+- **HTTPS**: Universal webhooks with signature validation
+- **Redis Pub/Sub**: Real-time notifications
+- **Apache Kafka**: High-throughput analytics pipelines
+- **AWS SQS**: AWS-native integrations
+- **Azure Event Hub**: Azure-native integrations
+- **AMQP (RabbitMQ)**: Enterprise message bus
+
+### Scalability
+
+| Environment | Events/Hour | Router Instances | Queue Partitions | Workers |
+|-------------|-------------|------------------|------------------|---------|
+| Small | <10k | 1-2 | 3 | 2-3 |
+| Medium | 10k-100k | 3-6 | 6-12 | 6-12 |
+| Large | 100k-500k | 6-12 | 12-24 | 12-24 |
+| Enterprise | 500k+ | 12-24+ | 24+ | 24+ |
+
+See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed design.
+
+## Quick Start
+
+### Development (Local)
+
+1. **Install dependencies:**
    ```sh
    npm install
    ```
-3. **Run locally:**
+
+2. **Configure app:**
    ```sh
+   cp config/default.yaml config/local.yaml
+   # Edit local.yaml with your GitHub App credentials
+   ```
+
+3. **Initialize database:**
+   ```sh
+   npm run db:reset
+   ```
+
+4. **Build and run:**
+   ```sh
+   npm run build
    npm start
    ```
-4. **Run tests:**
-   ```sh
-   npm test
-   ```
+
+### Production
+
+See [Configuration Examples](docs/CONFIGURATION.md) for production setups with:
+- PostgreSQL/MongoDB
+- Kafka/Redis/SQS
+- Docker Compose
+- Kubernetes
+
+## Configuration
+
+### Basic Configuration (config/local.yaml)
+
+```yaml
+server:
+  port: 8080
+
+app:
+  id: YOUR_GITHUB_APP_ID
+  private_key: YOUR_PRIVATE_KEY
+  webhook_secret: YOUR_WEBHOOK_SECRET
+
+database:
+  type: sqlite  # or postgres, mongodb
+  encryption_key: YOUR_ENCRYPTION_KEY
+  filename: ./database.sqlite
+
+event_processing:
+  queue:
+    type: memory  # or redis, kafka, sqs, azure-eventhub, amqp
+    
+  retry:
+    max_attempts: 5
+    backoff_strategy: exponential
+    initial_delay_ms: 2000
+    max_delay_ms: 300000
+```
+
+See [Configuration Documentation](docs/CONFIGURATION.md) for complete examples.
+
+## Subscriber Management
+
+### Add Subscriber (API)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-subscriber",
+    "events": ["push", "pull_request"],
+    "transport": {
+      "name": "https",
+      "config": {
+        "url": "https://myapp.com/webhook",
+        "webhook_secret": "my-secret"
+      }
+    }
+  }'
+```
+
+### Supported Transport Types
+
+#### HTTPS (Webhooks)
+```json
+{
+  "name": "https",
+  "config": {
+    "url": "https://myapp.com/webhook",
+    "webhook_secret": "secret"
+  }
+}
+```
+
+#### Kafka
+```json
+{
+  "name": "kafka",
+  "config": {
+    "brokers": ["kafka:9092"],
+    "topic": "github-events",
+    "ssl": true,
+    "sasl": {
+      "mechanism": "scram-sha-256",
+      "username": "user",
+      "password": "pass"
+    }
+  }
+}
+```
+
+See [Configuration Documentation](docs/CONFIGURATION.md) for all transport types.
+
+## Key Features
+
+### Horizontal Scaling
+- Add router instances behind load balancer
+- Scale workers independently with consumer groups
+- Partition queues for parallel processing
+
+### Reliability
+- At-least-once delivery guarantee
+- Configurable retry with exponential backoff
+- Dead letter queue for failed deliveries
+- Complete audit trail in database
+
+### Security
+- GitHub webhook signature validation
+- Encrypted storage of sensitive configuration
+- Rate limiting and payload size limits
+- TLS for all external communications
+
+### Monitoring
+- Event tracking and delivery metrics
+- Failed delivery alerts
+- Queue depth and lag monitoring
+- Configurable log levels
+
+## Kafka Support
+
+Kafka is highly recommended for enterprise deployments. Benefits:
+
+- **High Throughput**: 100k+ messages/second per partition
+- **Durability**: Persistent storage with replication
+- **Scalability**: Linear scaling by adding partitions
+- **Replay**: Can replay historical events
+- **Ordering**: Maintains order within partitions
+
+See [Kafka Feasibility Analysis](docs/KAFKA_FEASIBILITY.md) for detailed recommendations.
+
+## Documentation
+
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Configuration Guide](docs/CONFIGURATION.md)
+- [Kafka Feasibility Analysis](docs/KAFKA_FEASIBILITY.md)
+
+## Development
+
+### Build
+```sh
+npm run build         # Build server and UI
+npm run build:server  # Build server only
+```
+
+### Test
+```sh
+npm test              # Run tests
+npm run test:ci       # Run tests with coverage
+```
+
+### Lint
+```sh
+npm run lint          # Check code style
+npm run format:check  # Check formatting
+npm run format:write  # Fix formatting
+```
 
 ## Contributing
 
-Contributions are welcome! Please open issues or pull requests.  
-Before submitting a PR, ensure:
+Contributions are welcome! Please:
 
-- Code is linted and tested.
-- Documentation is updated as needed.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Run linting and tests
+5. Submit a pull request
 
 ## License
 
-This project is licensed under the Apache-2.0 License.
+Apache-2.0 License - see LICENSE file for details.
