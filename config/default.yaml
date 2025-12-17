@@ -1,8 +1,6 @@
 server:
   port: 8080
 app:
-  id: 1
-  private_key: <your_private_key>
   webhook_secret: foobarbaz123
 
 database:

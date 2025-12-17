@@ -18,9 +18,7 @@ describe("startServer", () => {
   test("logs correct server information", () => {
     const testConfig: Config = {
       app: {
-        id: 123,
         webhook_secret: "test-webhook",
-        private_key: "test-key",
       },
       server: {
         port: 3000,

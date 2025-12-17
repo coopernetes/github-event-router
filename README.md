@@ -107,8 +107,6 @@ server:
   port: 8080
 
 app:
-  id: YOUR_GITHUB_APP_ID
-  private_key: YOUR_PRIVATE_KEY
   webhook_secret: YOUR_WEBHOOK_SECRET
 
 database:

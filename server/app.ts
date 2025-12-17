@@ -26,8 +26,7 @@ export function startServer() {
   // Start the server
   const port = config.server.port || 8080;
   const server = app.listen(port, () => {
-    console.log(`App ID: ${config.app.id}`);
-    console.log(`Webhook Secret: ${config.app.webhook_secret}`);
+    console.log(`Webhook Secret: ${config.app.webhook_secret.substring(0, 4)}...`);
     console.log(`Server is running on port ${port}`);
   });
 

@@ -10,11 +10,6 @@ server:
   port: 8080
 
 app:
-  id: 123456
-  private_key: |
-    -----BEGIN RSA PRIVATE KEY-----
-    ...
-    -----END RSA PRIVATE KEY-----
   webhook_secret: dev-webhook-secret
 
 database:
@@ -65,8 +60,6 @@ server:
   port: 8080
 
 app:
-  id: ${GITHUB_APP_ID}
-  private_key: ${GITHUB_APP_PRIVATE_KEY}
   webhook_secret: ${GITHUB_WEBHOOK_SECRET}
 
 database:
@@ -126,8 +119,6 @@ server:
   port: 8080
 
 app:
-  id: ${GITHUB_APP_ID}
-  private_key: ${GITHUB_APP_PRIVATE_KEY}
   webhook_secret: ${GITHUB_WEBHOOK_SECRET}
 
 database:
@@ -197,8 +188,6 @@ server:
   port: 8080
 
 app:
-  id: ${GITHUB_APP_ID}
-  private_key: ${GITHUB_APP_PRIVATE_KEY}
   webhook_secret: ${GITHUB_WEBHOOK_SECRET}
 
 database:
@@ -259,8 +248,6 @@ server:
   port: 8080
 
 app:
-  id: ${GITHUB_APP_ID}
-  private_key: ${GITHUB_APP_PRIVATE_KEY}
   webhook_secret: ${GITHUB_WEBHOOK_SECRET}
 
 database:
@@ -425,9 +412,7 @@ security:
 
 ### Common Variables
 ```bash
-# GitHub App Configuration
-export GITHUB_APP_ID=123456
-export GITHUB_APP_PRIVATE_KEY="$(cat private-key.pem)"
+# GitHub Webhook Configuration
 export GITHUB_WEBHOOK_SECRET=your-webhook-secret
 
 # Database
@@ -521,16 +506,6 @@ spec:
         env:
         - name: NODE_ENV
           value: "production"
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
-              name: github-secrets
-              key: app-id
-        - name: GITHUB_APP_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: github-secrets
-              key: private-key
         - name: GITHUB_WEBHOOK_SECRET
           valueFrom:
             secretKeyRef:
