@@ -5,8 +5,6 @@ export interface Config {
     port: number;
   };
   app: {
-    id: number;
-    private_key: string;
     webhook_secret: string;
   };
   database: DatabaseConfig | undefined;
@@ -15,7 +13,7 @@ export interface Config {
   security: SecurityConfig;
 }
 
-export type DatabaseType = "sqlite" | "postgres";
+export type DatabaseType = "sqlite" | "postgres" | "mongodb";
 
 export interface DatabaseConfig {
   type: DatabaseType;
@@ -80,8 +78,6 @@ export function loadConfig(): Config {
       port: config.get("server.port"),
     },
     app: {
-      id: config.get("app.id"),
-      private_key: config.get("app.private_key"),
       webhook_secret: config.get("app.webhook_secret"),
     },
     database: config.get("database"),

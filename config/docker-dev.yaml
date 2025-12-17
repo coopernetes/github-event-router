@@ -1,14 +1,21 @@
 server:
   port: 8080
+
 app:
-  webhook_secret: foobarbaz123
+  webhook_secret: dev-webhook-secret-123
 
 database:
-  encryption_key: super_s3cret
   type: sqlite
-  filename: ./database.sqlite
+  encryption_key: dev-encryption-key-must-be-32-chars
+  filename: /app/data/database.sqlite
 
 event_processing:
+  queue:
+    type: memory
+    options:
+      maxRetries: 3
+      visibilityTimeout: 30000
+
   retry:
     max_attempts: 3
     backoff_strategy: exponential
@@ -27,10 +34,10 @@ event_processing:
 
 monitoring:
   enable_metrics: true
-  log_level: info
+  log_level: debug
   failed_delivery_alerts: true
 
 security:
-  enable_rate_limiting: true
+  enable_rate_limiting: false
   requests_per_minute: 1000
   payload_size_limit_mb: 10

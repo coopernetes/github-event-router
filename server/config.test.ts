@@ -25,12 +25,8 @@ describe("loadConfig", () => {
       switch (key) {
         case "server.port":
           return 8080;
-        case "app.id":
-          return 123;
         case "app.webhook_secret":
           return "test-webhook";
-        case "app.private_key":
-          return "test-key";
         case "database":
           return {
             type: "sqlite",
@@ -49,9 +45,7 @@ describe("loadConfig", () => {
         port: 8080,
       },
       app: {
-        id: 123,
         webhook_secret: "test-webhook",
-        private_key: "test-key",
       },
       database: {
         type: "sqlite",

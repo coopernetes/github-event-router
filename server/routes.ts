@@ -11,6 +11,7 @@ import {
 } from "./subscriber.js";
 import { HealthMonitor } from "./health-monitor.js";
 import { getAppConfig } from "./config.js";
+import { TransportFactory } from "./transports/factory.js";
 
 // Health monitor will be initialized lazily
 let healthMonitor: HealthMonitor | null = null;
@@ -23,40 +24,26 @@ function getHealthMonitor(): HealthMonitor {
   return healthMonitor;
 }
 
-// Type guards for validation
-type UnknownConfig = {
-  [key: string]: unknown;
-  url?: unknown;
-  webhook_secret?: unknown;
-  password?: unknown;
-};
-
 // Input validation utilities
-function isValidTransportName(name: string): name is TransportName {
-  return ["https", "redis"].includes(name);
+function isValidTransportName(name: string): boolean {
+  const supportedTypes = TransportFactory.getSupportedTypes();
+  return supportedTypes.includes(name as TransportName);
 }
 
-function isValidTransportConfig(
-  name: TransportName,
+/**
+ * Validate transport configuration using the transport factory
+ * This ensures validation happens at registration time, not delivery time
+ */
+function validateTransportConfig(
+  name: string,
   config: unknown
-): config is HttpsTransportConfig | RedisTransportConfig {
-  if (!config || typeof config !== "object") return false;
-
-  const unknownConfig = config as UnknownConfig;
-  if (name === "https") {
-    return (
-      typeof unknownConfig.url === "string" &&
-      typeof unknownConfig.webhook_secret === "string" &&
-      Object.keys(unknownConfig).length === 2
-    );
-  } else if (name === "redis") {
-    return (
-      typeof unknownConfig.url === "string" &&
-      typeof unknownConfig.password === "string" &&
-      Object.keys(unknownConfig).length === 2
-    );
+): { valid: boolean; error?: string } {
+  if (!config || typeof config !== "object") {
+    return { valid: false, error: "Transport config must be an object" };
   }
-  return false;
+
+  const appConfig = getAppConfig();
+  return TransportFactory.validateConfig(name, config, appConfig);
 }
 
 function isValidEvents(events: unknown): events is string[] {
@@ -136,8 +123,12 @@ router.post("/subscribers", (req, res) => {
       return res.status(400).json({ error: "Invalid transport type" });
     }
 
-    if (!isValidTransportConfig(transport.name, transport.config)) {
-      return res.status(400).json({ error: "Invalid transport configuration" });
+    // Validate transport configuration at registration time (fail fast)
+    const validation = validateTransportConfig(transport.name, transport.config);
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: validation.error || "Invalid transport configuration" 
+      });
     }
 
     const subscriber = createSubscriber(name, events, transport);
@@ -174,15 +165,16 @@ router.put("/subscribers/:id", (req, res) => {
       if (!isValidTransportName(updates.transport.name)) {
         return res.status(400).json({ error: "Invalid transport type" });
       }
-      if (
-        !isValidTransportConfig(
-          updates.transport.name,
-          updates.transport.config
-        )
-      ) {
-        return res
-          .status(400)
-          .json({ error: "Invalid transport configuration" });
+      
+      // Validate transport configuration at registration time (fail fast)
+      const validation = validateTransportConfig(
+        updates.transport.name,
+        updates.transport.config
+      );
+      if (!validation.valid) {
+        return res.status(400).json({ 
+          error: validation.error || "Invalid transport configuration" 
+        });
       }
     }
 
