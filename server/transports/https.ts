@@ -40,20 +40,11 @@ export class HttpsTransport implements ITransport {
     const startTime = Date.now();
     const httpsConfig = transportConfig as HttpsTransportConfig;
 
-    if (!this.validateConfig(httpsConfig)) {
-      return {
-        success: false,
-        error: "Invalid HTTPS transport configuration",
-        durationMs: Date.now() - startTime,
-        attempt: 1,
-      };
-    }
-
     try {
       // Prepare payload
       const payloadString = JSON.stringify(event.payload);
 
-      // Generate signature for subscriber
+      // Generate signature for subscriber (GitHub webhook format)
       const signature = this.generateSignature(
         payloadString,
         httpsConfig.webhook_secret
@@ -104,6 +95,13 @@ export class HttpsTransport implements ITransport {
     }
   }
 
+  /**
+   * Generate GitHub webhook signature (SHA-256 HMAC)
+   * Format matches GitHub's webhook signature: "sha256=<hex_digest>"
+   * This is compatible with @octokit/webhooks and GitHub's native webhook format
+   * 
+   * @see https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
+   */
   private generateSignature(payload: string, secret: string): string {
     const hmac = crypto.createHmac("sha256", secret);
     return "sha256=" + hmac.update(payload).digest("hex");

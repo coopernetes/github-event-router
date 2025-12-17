@@ -31,6 +31,27 @@ export class TransportFactory {
     return new TransportClass(config);
   }
 
+  /**
+   * Validate transport configuration without creating an instance
+   * This should be called during subscriber registration to fail fast
+   */
+  static validateConfig(type: string, transportConfig: unknown, config: Config): { valid: boolean; error?: string } {
+    const TransportClass = this.transports.get(type);
+    if (!TransportClass) {
+      return { valid: false, error: `Unknown transport type: ${type}` };
+    }
+    
+    // Create a temporary instance to use its validation method
+    const transport = new TransportClass(config);
+    const isValid = transport.validateConfig(transportConfig);
+    
+    if (!isValid) {
+      return { valid: false, error: `Invalid configuration for ${type} transport` };
+    }
+    
+    return { valid: true };
+  }
+
   static getSupportedTypes(): TransportName[] {
     return Array.from(this.transports.keys()) as TransportName[];
   }
