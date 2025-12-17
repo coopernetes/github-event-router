@@ -1,0 +1,66 @@
+server:
+  port: 8080
+
+app:
+  id: 1
+  private_key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF1D4JvYsZcyxY6FgNlVqNR0X6sQi
+    GbHN9uwi8tQ6UlYqE3V3v3uJ/xPKWvEPQ8d0nPBPZxJQQKjMB3E3yGNRGSvKbWY8
+    D1nLkqYsZ5VWcxN1G5OkWnBT3kkQMNvQGGmKMQmCQ3Z6E5qGNYmBT8K3ROlJ8Y7a
+    Bvz9LVGxRqU8z3nQvWYeYqZT0mR3NE7FJxQqYGvKLqFy3qLRKm5tYzQ6R5W6eCkK
+    b5A3EzN4KzJFLk9Z7XZ4iZhJDKJFJQc5L5LqHnRVWBz8eJQ4F8yGNZ7XRBcQBN7e
+    ZJQ5eJ9Y8FVvQRJZ3F4Q8WZL6R4F8Z5E7Q8WZQIDAQABAoIBAC8VkgFJ9ZJqYqQ5
+    -----END RSA PRIVATE KEY-----
+  webhook_secret: prod-webhook-secret-456
+
+database:
+  type: postgres
+  encryption_key: prod-encryption-key-must-be-32-ch
+  host: postgres
+  port: 5432
+  username: github_router
+  password: router_password_123
+  database: github_events
+
+event_processing:
+  queue:
+    type: kafka
+    kafka:
+      brokers:
+        - kafka:9092
+      topic: github-events
+      clientId: github-event-router
+      groupId: github-event-router-processors
+      partitions: 6
+      replicationFactor: 1
+    options:
+      maxRetries: 5
+      visibilityTimeout: 60000
+      retentionPeriod: 604800000
+
+  retry:
+    max_attempts: 5
+    backoff_strategy: exponential
+    initial_delay_ms: 2000
+    max_delay_ms: 300000
+    retryable_status_codes: [500, 502, 503, 504, 408, 429, 0]
+
+  timeouts:
+    http_delivery_timeout_ms: 30000
+    redis_delivery_timeout_ms: 10000
+
+  queue:
+    batch_size: 50
+    processing_interval_ms: 500
+    dead_letter_threshold: 10
+
+monitoring:
+  enable_metrics: true
+  log_level: info
+  failed_delivery_alerts: true
+
+security:
+  enable_rate_limiting: true
+  requests_per_minute: 10000
+  payload_size_limit_mb: 25

@@ -1,0 +1,187 @@
+version: '3.8'
+
+# Production-ready setup with PostgreSQL, Kafka, and Redis
+# This is the most resilient setup for enterprise deployments
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: github-router-postgres
+    environment:
+      - POSTGRES_DB=github_events
+      - POSTGRES_USER=github_router
+      - POSTGRES_PASSWORD=router_password_123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations/postgres:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U github_router -d github_events"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - github-router-prod
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: github-router-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    restart: unless-stopped
+    networks:
+      - github-router-prod
+
+  # Kafka Message Queue
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: github-router-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - github-router-prod
+
+  # Redis (optional, for caching or alternate transport)
+  redis:
+    image: redis:7-alpine
+    container_name: github-router-redis
+    command: redis-server --requirepass redis_password_123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - github-router-prod
+
+  # GitHub Event Router - Receiver
+  router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: github-event-router-receiver
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=docker-prod
+      - NODE_CONFIG_DIR=/app/config
+    volumes:
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/v1/liveness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - github-router-prod
+
+  # GitHub Event Router - Worker/Processor
+  # This processes events from Kafka and delivers to subscribers
+  router-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: github-event-router-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      router:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=docker-prod
+      - NODE_CONFIG_DIR=/app/config
+      - WORKER_MODE=true
+    volumes:
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    networks:
+      - github-router-prod
+    deploy:
+      replicas: 2
+
+  # Example webhook receiver (subscriber)
+  example-receiver:
+    build:
+      context: ./example-receiver
+      dockerfile: Dockerfile
+    container_name: example-receiver-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - WEBHOOK_SECRET=prod-webhook-secret-456
+    restart: unless-stopped
+    networks:
+      - github-router-prod
+
+  # Kafka UI for monitoring (optional)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: github-router-kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    restart: unless-stopped
+    networks:
+      - github-router-prod
+
+networks:
+  github-router-prod:
+    name: github-router-prod
+    driver: bridge
+
+volumes:
+  postgres-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-logs:
+  redis-data:

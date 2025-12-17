@@ -1,0 +1,52 @@
+version: '3.8'
+
+# Basic development setup with SQLite and in-memory queue
+# This is the least resilient setup but easiest to run locally
+
+services:
+  # GitHub Event Router - Receiver and Processor in one container
+  router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: github-event-router-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=docker-dev
+      - NODE_CONFIG_DIR=/app/config
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/v1/liveness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - github-router-dev
+
+  # Example webhook receiver (subscriber)
+  example-receiver:
+    build:
+      context: ./example-receiver
+      dockerfile: Dockerfile
+    container_name: example-receiver-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - WEBHOOK_SECRET=dev-webhook-secret-123
+    restart: unless-stopped
+    networks:
+      - github-router-dev
+
+networks:
+  github-router-dev:
+    name: github-router-dev
+    driver: bridge
+
+volumes:
+  data:

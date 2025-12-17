@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+app:
+  id: 1
+  private_key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF1D4JvYsZcyxY6FgNlVqNR0X6sQi
+    GbHN9uwi8tQ6UlYqE3V3v3uJ/xPKWvEPQ8d0nPBPZxJQQKjMB3E3yGNRGSvKbWY8
+    D1nLkqYsZ5VWcxN1G5OkWnBT3kkQMNvQGGmKMQmCQ3Z6E5qGNYmBT8K3ROlJ8Y7a
+    Bvz9LVGxRqU8z3nQvWYeYqZT0mR3NE7FJxQqYGvKLqFy3qLRKm5tYzQ6R5W6eCkK
+    b5A3EzN4KzJFLk9Z7XZ4iZhJDKJFJQc5L5LqHnRVWBz8eJQ4F8yGNZ7XRBcQBN7e
+    ZJQ5eJ9Y8FVvQRJZ3F4Q8WZL6R4F8Z5E7Q8WZQIDAQABAoIBAC8VkgFJ9ZJqYqQ5
+    -----END RSA PRIVATE KEY-----
+  webhook_secret: dev-webhook-secret-123
+
+database:
+  type: sqlite
+  encryption_key: dev-encryption-key-must-be-32-chars
+  filename: /app/data/database.sqlite
+
+event_processing:
+  queue:
+    type: memory
+    options:
+      maxRetries: 3
+      visibilityTimeout: 30000
+
+  retry:
+    max_attempts: 3
+    backoff_strategy: exponential
+    initial_delay_ms: 1000
+    max_delay_ms: 30000
+    retryable_status_codes: [500, 502, 503, 504, 408, 429]
+
+  timeouts:
+    http_delivery_timeout_ms: 10000
+    redis_delivery_timeout_ms: 5000
+
+  queue:
+    batch_size: 10
+    processing_interval_ms: 1000
+    dead_letter_threshold: 5
+
+monitoring:
+  enable_metrics: true
+  log_level: debug
+  failed_delivery_alerts: true
+
+security:
+  enable_rate_limiting: false
+  requests_per_minute: 1000
+  payload_size_limit_mb: 10
