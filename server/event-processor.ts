@@ -5,6 +5,10 @@ import { RetryHandler, type RetryContext } from "./retry.js";
 import { getSubscribers, type Subscriber } from "./subscriber.js";
 import { encryptHeaders, decryptHeaders } from "./encryption.js";
 import crypto from "crypto";
+import { trace } from "@opentelemetry/api";
+import { getAppMetrics } from "./telemetry.js";
+
+const tracer = trace.getTracer("github-event-router");
 
 export interface EventProcessingResult {
   eventId: string;
@@ -94,71 +98,143 @@ export class EventProcessor {
     subscriber: Subscriber,
     eventId: number
   ): Promise<EventProcessingResult> {
-    if (!subscriber.transport) {
-      const error = "Subscriber has no transport configuration";
-      await this.recordDeliveryAttempt(
-        eventId,
-        subscriber.id,
-        1,
-        undefined,
-        error,
-        0
-      );
-      return {
-        eventId: event.id,
-        subscriberId: subscriber.id,
-        success: false,
-        error,
-        attempts: 1,
-        durationMs: 0,
-      };
-    }
-
-    const transport = TransportFactory.create(
-      subscriber.transport.name,
-      this.config
-    );
-    const startTime = Date.now();
-
-    try {
-      const result = await transport.deliver(
-        event,
-        subscriber.transport.config
-      );
-
-      await this.recordDeliveryAttempt(
-        eventId,
-        subscriber.id,
-        1,
-        result.statusCode,
-        result.error,
-        result.durationMs
-      );
-
-      if (result.success) {
+    return tracer.startActiveSpan("event.deliver_to_subscriber", async (span) => {
+      const metrics = getAppMetrics();
+      
+      span.setAttribute("subscriber.id", subscriber.id);
+      span.setAttribute("subscriber.name", subscriber.name || "unknown");
+      span.setAttribute("event.type", event.type);
+      span.setAttribute("event.id", event.id);
+      
+      if (!subscriber.transport) {
+        const error = "Subscriber has no transport configuration";
+        span.setAttribute("error", true);
+        span.setAttribute("error.message", error);
+        span.end();
+        
+        await this.recordDeliveryAttempt(
+          eventId,
+          subscriber.id,
+          1,
+          undefined,
+          error,
+          0
+        );
+        
+        metrics.deliveryAttempts.add(1, {
+          subscriber_id: subscriber.id.toString(),
+          transport: "none",
+        });
+        metrics.deliveryFailure.add(1, {
+          subscriber_id: subscriber.id.toString(),
+          transport: "none",
+          error: "no_transport",
+        });
+        
         return {
           eventId: event.id,
           subscriberId: subscriber.id,
-          success: true,
-          statusCode: result.statusCode ?? 200,
+          success: false,
+          error,
           attempts: 1,
-          durationMs: result.durationMs,
+          durationMs: 0,
         };
       }
 
-      // Check if we should retry
-      const retryContext: RetryContext = {
-        subscriberId: subscriber.id,
-        eventId: event.id,
-        eventType: event.type,
-        attempt: 1,
-      };
+      const transport = TransportFactory.create(
+        subscriber.transport.name,
+        this.config
+      );
+      const startTime = Date.now();
 
-      if (this.retryHandler.shouldRetry(result, retryContext)) {
-        const nextRetryAt = this.retryHandler.getNextRetryTime(2);
+      span.setAttribute("transport.type", subscriber.transport.name);
 
-        await this.scheduleRetry(eventId, subscriber.id, 2, nextRetryAt);
+      try {
+        const result = await transport.deliver(
+          event,
+          subscriber.transport.config
+        );
 
+        await this.recordDeliveryAttempt(
+          eventId,
+          subscriber.id,
+          1,
+          result.statusCode,
+          result.error,
+          result.durationMs
+        );
+
+        // Record metrics
+        metrics.deliveryAttempts.add(1, {
+          subscriber_id: subscriber.id.toString(),
+          transport: subscriber.transport.name,
+        });
+        metrics.transportDeliveryDuration.record(result.durationMs, {
+          transport: subscriber.transport.name,
+          subscriber_id: subscriber.id.toString(),
+        });
+
+        if (result.success) {
+          span.setAttribute("delivery.success", true);
+          span.setAttribute("delivery.status_code", result.statusCode ?? 200);
+          span.end();
+          
+          metrics.deliverySuccess.add(1, {
+            subscriber_id: subscriber.id.toString(),
+            transport: subscriber.transport.name,
+          });
+          
+          return {
+            eventId: event.id,
+            subscriberId: subscriber.id,
+            success: true,
+            statusCode: result.statusCode ?? 200,
+            attempts: 1,
+            durationMs: result.durationMs,
+          };
+        }
+
+        // Check if we should retry
+        const retryContext: RetryContext = {
+          subscriberId: subscriber.id,
+          eventId: event.id,
+          eventType: event.type,
+          attempt: 1,
+        };
+
+        span.setAttribute("delivery.success", false);
+        span.setAttribute("delivery.status_code", result.statusCode ?? 0);
+        span.setAttribute("delivery.error", result.error || "Delivery failed");
+
+        metrics.deliveryFailure.add(1, {
+          subscriber_id: subscriber.id.toString(),
+          transport: subscriber.transport.name,
+          error: "delivery_failed",
+        });
+
+        if (this.retryHandler.shouldRetry(result, retryContext)) {
+          const nextRetryAt = this.retryHandler.getNextRetryTime(2);
+          span.setAttribute("delivery.will_retry", true);
+          span.setAttribute("delivery.next_retry_at", nextRetryAt.toISOString());
+
+          await this.scheduleRetry(eventId, subscriber.id, 2, nextRetryAt);
+
+          span.end();
+          return {
+            eventId: event.id,
+            subscriberId: subscriber.id,
+            success: false,
+            statusCode: result.statusCode ?? 0,
+            error: result.error ?? "Delivery failed",
+            attempts: 1,
+            nextRetryAt,
+            durationMs: result.durationMs,
+          };
+        }
+
+        span.setAttribute("delivery.will_retry", false);
+        span.end();
+        
         return {
           eventId: event.id,
           subscriberId: subscriber.id,
@@ -166,71 +242,98 @@ export class EventProcessor {
           statusCode: result.statusCode ?? 0,
           error: result.error ?? "Delivery failed",
           attempts: 1,
-          nextRetryAt,
           durationMs: result.durationMs,
         };
+      } catch (error) {
+        const durationMs = Date.now() - startTime;
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+
+        span.setAttribute("error", true);
+        span.setAttribute("error.message", errorMessage);
+        span.end();
+
+        await this.recordDeliveryAttempt(
+          eventId,
+          subscriber.id,
+          1,
+          undefined,
+          errorMessage,
+          durationMs
+        );
+
+        metrics.deliveryAttempts.add(1, {
+          subscriber_id: subscriber.id.toString(),
+          transport: subscriber.transport.name,
+        });
+        metrics.deliveryFailure.add(1, {
+          subscriber_id: subscriber.id.toString(),
+          transport: subscriber.transport.name,
+          error: "exception",
+        });
+
+        return {
+          eventId: event.id,
+          subscriberId: subscriber.id,
+          success: false,
+          error: errorMessage,
+          attempts: 1,
+          durationMs,
+        };
       }
-
-      return {
-        eventId: event.id,
-        subscriberId: subscriber.id,
-        success: false,
-        statusCode: result.statusCode ?? 0,
-        error: result.error ?? "Delivery failed",
-        attempts: 1,
-        durationMs: result.durationMs,
-      };
-    } catch (error) {
-      const durationMs = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-
-      await this.recordDeliveryAttempt(
-        eventId,
-        subscriber.id,
-        1,
-        undefined,
-        errorMessage,
-        durationMs
-      );
-
-      return {
-        eventId: event.id,
-        subscriberId: subscriber.id,
-        success: false,
-        error: errorMessage,
-        attempts: 1,
-        durationMs,
-      };
-    }
+    });
   }
 
   private async storeEvent(event: GitHubEvent): Promise<number> {
-    const payloadString = JSON.stringify(event.payload);
-    // Encrypt headers to protect sensitive information like webhook signatures
-    const encryptedHeaders = encryptHeaders(event.headers);
-    const payloadHash = crypto
-      .createHash("sha256")
-      .update(payloadString)
-      .digest("hex");
+    return tracer.startActiveSpan("event.store", (span) => {
+      const metrics = getAppMetrics();
+      const startTime = Date.now();
+      
+      span.setAttribute("event.type", event.type);
+      span.setAttribute("event.id", event.id);
+      
+      try {
+        const payloadString = JSON.stringify(event.payload);
+        // Encrypt headers to protect sensitive information like webhook signatures
+        const encryptedHeaders = encryptHeaders(event.headers);
+        const payloadHash = crypto
+          .createHash("sha256")
+          .update(payloadString)
+          .digest("hex");
 
-    const stmt = this.db.prepare(`
-      INSERT INTO events (github_delivery_id, event_type, payload_hash, payload_size, payload_data, headers_data, received_at, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+        span.setAttribute("event.payload_size", Buffer.from(payloadString).length);
+        span.setAttribute("event.payload_hash", payloadHash);
 
-    const result = stmt.run(
-      event.id,
-      event.type,
-      payloadHash,
-      Buffer.from(payloadString).length,
-      payloadString,
-      encryptedHeaders,
-      event.receivedAt.toISOString(),
-      "pending"
-    );
+        const stmt = this.db.prepare(`
+          INSERT INTO events (github_delivery_id, event_type, payload_hash, payload_size, payload_data, headers_data, received_at, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
 
-    return result.lastInsertRowid as number;
+        const result = stmt.run(
+          event.id,
+          event.type,
+          payloadHash,
+          Buffer.from(payloadString).length,
+          payloadString,
+          encryptedHeaders,
+          event.receivedAt.toISOString(),
+          "pending"
+        );
+
+        const durationMs = Date.now() - startTime;
+        metrics.databaseLatency.record(durationMs, {
+          operation: "insert_event",
+        });
+        
+        span.end();
+        return result.lastInsertRowid as number;
+      } catch (error) {
+        span.setAttribute("error", true);
+        span.setAttribute("error.message", error instanceof Error ? error.message : "Unknown error");
+        span.end();
+        throw error;
+      }
+    });
   }
 
   private async updateEventStatus(

@@ -198,11 +198,16 @@ See [Configuration Documentation](docs/CONFIGURATION.md) for all transport types
 - Rate limiting and payload size limits
 - TLS for all external communications
 
-### Monitoring
+### Monitoring & Observability
+- OpenTelemetry integration for distributed tracing
+- Prometheus metrics endpoint for monitoring
 - Event tracking and delivery metrics
 - Failed delivery alerts
 - Queue depth and lag monitoring
+- Database and transport performance metrics
 - Configurable log levels
+
+See [Observability Documentation](docs/OBSERVABILITY.md) for detailed metrics and monitoring setup.
 
 ## Kafka Support
 
@@ -220,6 +225,7 @@ See [Kafka Feasibility Analysis](docs/KAFKA_FEASIBILITY.md) for detailed recomme
 
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [Configuration Guide](docs/CONFIGURATION.md)
+- [Observability & Monitoring](docs/OBSERVABILITY.md)
 - [Kafka Feasibility Analysis](docs/KAFKA_FEASIBILITY.md)
 
 ## Development
