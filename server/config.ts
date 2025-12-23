@@ -13,7 +13,7 @@ export interface Config {
   security: SecurityConfig;
 }
 
-export type DatabaseType = "sqlite" | "postgres" | "mongodb";
+export type DatabaseType = "sqlite" | "postgres";
 
 export interface DatabaseConfig {
   type: DatabaseType;

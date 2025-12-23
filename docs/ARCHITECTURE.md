@@ -39,7 +39,7 @@ The GitHub Event Router is designed for horizontal scalability in enterprise env
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Database Layer                               │
-│            (SQLite / PostgreSQL / MongoDB)                       │
+│                  (SQLite / PostgreSQL)                           │
 │                   - Subscriber configuration                     │
 │                   - Event tracking                               │
 │                   - Delivery audit                               │
@@ -56,12 +56,14 @@ The GitHub Event Router is designed for horizontal scalability in enterprise env
 ## Layer Descriptions
 
 ### 1. Router Instances (Receiver Layer)
+
 - **Purpose**: Receive GitHub webhooks, validate, and enqueue
 - **Scalability**: Horizontal (add more instances behind load balancer)
 - **State**: Stateless (configuration from database)
 - **HA**: Active-active, any instance can process any webhook
 
 ### 2. Internal Queue Layer
+
 - **Purpose**: Decouple receiving from processing, enable horizontal scaling
 - **Options**: Memory (dev), Redis, Kafka, AWS SQS, Azure Event Hub, AMQP
 - **Features**:
@@ -72,14 +74,16 @@ The GitHub Event Router is designed for horizontal scalability in enterprise env
 - **Recommended**: Kafka for enterprise scale
 
 ### 3. Worker/Processor Layer
+
 - **Purpose**: Process events from queue and deliver to subscribers
 - **Scalability**: Horizontal (consumer groups)
 - **State**: Stateless (pull config from database)
 - **HA**: Active-active with consumer group coordination
 
 ### 4. Database Layer
+
 - **Purpose**: Store subscriber config, event audit, delivery tracking
-- **Options**: SQLite (dev), PostgreSQL, MongoDB
+- **Options**: SQLite (dev), PostgreSQL
 - **Features**:
   - Subscriber management
   - Event tracking
@@ -88,6 +92,7 @@ The GitHub Event Router is designed for horizontal scalability in enterprise env
 - **Recommended**: PostgreSQL for enterprise scale
 
 ### 5. Subscriber Transport Layer
+
 - **Purpose**: Deliver events to subscribers
 - **Options**: HTTPS, Redis Pub/Sub, Kafka, AWS SQS, Azure Event Hub, AMQP
 - **Features**:
@@ -99,18 +104,22 @@ The GitHub Event Router is designed for horizontal scalability in enterprise env
 ## Scalability Characteristics
 
 ### Vertical Limits (Single Instance)
+
 - **Throughput**: ~5,000 events/second
 - **Memory**: ~2GB per instance
 - **CPU**: 2-4 cores recommended
 
 ### Horizontal Scaling
+
 - **Router Instances**: Linear scaling up to load balancer limits
 - **Queue Partitions**: Linear scaling (Kafka/AMQP)
 - **Worker Instances**: Linear scaling with queue partitions
 - **Database**: Single writer, multiple readers (PostgreSQL)
 
 ### Enterprise Scale (70k repos, 10k developers)
+
 Recommended configuration:
+
 - **Router Instances**: 6-12 instances
 - **Queue**: Kafka with 12-24 partitions
 - **Workers**: 12-24 instances
@@ -121,6 +130,7 @@ Recommended configuration:
 ## Data Flow
 
 ### Ingestion Path
+
 1. GitHub sends webhook to load balancer
 2. Router instance receives webhook
 3. Validates signature and payload
@@ -129,6 +139,7 @@ Recommended configuration:
 6. Returns 200 OK to GitHub
 
 ### Processing Path
+
 1. Worker pulls event from queue
 2. Queries database for matching subscribers
 3. For each subscriber:
@@ -139,6 +150,7 @@ Recommended configuration:
 4. Acknowledges message from queue
 
 ### Retry Path
+
 1. Periodic job scans for pending retries
 2. For each retry:
    - Pulls event and subscriber config
@@ -148,6 +160,7 @@ Recommended configuration:
 ## Fault Tolerance
 
 ### Component Failures
+
 - **Router instance down**: Load balancer routes to healthy instances
 - **Queue down**: Routers buffer and retry (temp), workers wait
 - **Worker down**: Other workers pick up its partitions
@@ -155,28 +168,33 @@ Recommended configuration:
 - **Subscriber down**: Retries with exponential backoff, DLQ after max
 
 ### Data Durability
+
 - **Events**: Persisted to database and queue
 - **Delivery tracking**: Recorded in database
 - **Configuration**: Stored in database with backups
 
 ### Recovery
+
 - **Automatic**: Queue consumer rebalancing, database failover
 - **Manual**: DLQ replay, event replay from audit log
 
 ## Security Considerations
 
 ### Inbound
+
 - Webhook signature validation (GitHub → Router)
 - TLS termination at load balancer
 - IP allowlisting (optional)
 - Rate limiting per source
 
 ### Internal
+
 - Queue authentication (SASL, IAM, etc.)
 - Database authentication and encryption
 - Encrypted storage of sensitive config (webhook secrets)
 
 ### Outbound
+
 - Signature generation for subscribers (HTTPS)
 - TLS for all HTTP transports
 - Authentication for queue/message transports
@@ -184,6 +202,7 @@ Recommended configuration:
 ## Monitoring and Observability
 
 ### Metrics
+
 - Events received per second
 - Queue depth and lag
 - Delivery success/failure rates
@@ -192,12 +211,14 @@ Recommended configuration:
 - Database query performance
 
 ### Logs
+
 - Event reception with delivery ID
 - Delivery attempts with results
 - Errors and exceptions
 - Retry schedules
 
 ### Alerts
+
 - Queue depth threshold
 - Failed delivery rate threshold
 - Worker lag threshold
@@ -207,6 +228,7 @@ Recommended configuration:
 ## Technology Choices
 
 ### Why Kafka for Internal Queue?
+
 - Highest throughput (100k+ msg/sec)
 - Best durability with replication
 - Excellent scaling (add partitions)
@@ -215,6 +237,7 @@ Recommended configuration:
 - Battle-tested at scale
 
 ### Why PostgreSQL for Database?
+
 - ACID compliance
 - Rich query capabilities
 - Excellent performance
@@ -223,6 +246,7 @@ Recommended configuration:
 - Proven at enterprise scale
 
 ### Why Support Multiple Transports?
+
 - **HTTPS**: Universal compatibility, easy debugging
 - **Kafka**: High throughput analytics pipelines
 - **SQS**: AWS-native integrations
