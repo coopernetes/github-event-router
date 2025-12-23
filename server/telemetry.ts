@@ -2,11 +2,6 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
-import type { Resource } from "@opentelemetry/resources";
-import {
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-} from "@opentelemetry/semantic-conventions";
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
 import type { Meter, Counter, Histogram, ObservableGauge } from "@opentelemetry/api";
 import { metrics } from "@opentelemetry/api";
@@ -41,7 +36,7 @@ export function initializeTelemetry(): void {
       new HttpInstrumentation({
         requestHook: (span, request) => {
           // Add custom attributes to HTTP spans
-          span.setAttribute("http.route", (request as any).route?.path || "unknown");
+          span.setAttribute("http.route", (request as { route?: { path: string } }).route?.path || "unknown");
         },
       }),
       new ExpressInstrumentation(),

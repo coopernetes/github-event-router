@@ -3,7 +3,7 @@ import { getAppConfig } from "./config.js";
 import { EventProcessor } from "./event-processor.js";
 import { WebhookSecurity } from "./webhook-security.js";
 import { type GitHubEvent } from "./transport.js";
-import { trace, context } from "@opentelemetry/api";
+import { trace } from "@opentelemetry/api";
 import { getAppMetrics } from "./telemetry.js";
 
 const tracer = trace.getTracer("github-event-router");
