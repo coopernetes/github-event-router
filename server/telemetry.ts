@@ -80,20 +80,20 @@ export function createAppMetrics(
 
   appMetrics = {
     // Counter: Total webhook events received
-    webhookEventsReceived: meter.createCounter("webhook.events.received", {
+    webhookEventsReceived: meter.createCounter("webhook_events_received", {
       description: "Total number of webhook events received from GitHub",
       unit: "1",
     }),
 
     // Counter: Total webhook events processed
-    webhookEventsProcessed: meter.createCounter("webhook.events.processed", {
+    webhookEventsProcessed: meter.createCounter("webhook_events_processed", {
       description: "Total number of webhook events processed",
       unit: "1",
     }),
 
     // Histogram: Event processing duration
     eventProcessingDuration: meter.createHistogram(
-      "event.processing.duration",
+      "event_processing_duration",
       {
         description: "Duration of event processing in milliseconds",
         unit: "ms",
@@ -101,50 +101,50 @@ export function createAppMetrics(
     ),
 
     // Counter: Total delivery attempts
-    deliveryAttempts: meter.createCounter("delivery.attempts", {
+    deliveryAttempts: meter.createCounter("delivery_attempts", {
       description: "Total number of delivery attempts to subscribers",
       unit: "1",
     }),
 
     // Counter: Successful deliveries
-    deliverySuccess: meter.createCounter("delivery.success", {
+    deliverySuccess: meter.createCounter("delivery_success", {
       description: "Total number of successful deliveries",
       unit: "1",
     }),
 
     // Counter: Failed deliveries
-    deliveryFailure: meter.createCounter("delivery.failure", {
+    deliveryFailure: meter.createCounter("delivery_failure", {
       description: "Total number of failed deliveries",
       unit: "1",
     }),
 
     // Gauge: Current queue depth
-    queueDepth: meter.createObservableGauge("queue.depth", {
+    queueDepth: meter.createObservableGauge("queue_depth", {
       description: "Current number of events in the processing queue",
       unit: "1",
     }),
 
     // Gauge: Current retry queue depth
-    retryQueueDepth: meter.createObservableGauge("retry.queue.depth", {
+    retryQueueDepth: meter.createObservableGauge("retry_queue_depth", {
       description: "Current number of events in the retry queue",
       unit: "1",
     }),
 
     // Gauge: Active subscribers
-    activeSubscribers: meter.createObservableGauge("subscribers.active", {
+    activeSubscribers: meter.createObservableGauge("subscribers_active", {
       description: "Current number of active subscribers",
       unit: "1",
     }),
 
     // Histogram: Database operation latency
-    databaseLatency: meter.createHistogram("database.latency", {
+    databaseLatency: meter.createHistogram("database_latency", {
       description: "Database operation latency in milliseconds",
       unit: "ms",
     }),
 
     // Histogram: Transport delivery duration
     transportDeliveryDuration: meter.createHistogram(
-      "transport.delivery.duration",
+      "transport_delivery_duration",
       {
         description: "Duration of transport delivery operations in milliseconds",
         unit: "ms",
