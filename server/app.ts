@@ -1,7 +1,11 @@
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { loadConfig, setAppConfig } from "./config.js";
 import { router as apiRoutes } from "./routes.js";
 import { setupWebhooks } from "./github.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function startServer() {
   const app = express();
@@ -15,13 +19,22 @@ export function startServer() {
   // Parse JSON for all other routes
   app.use(express.json());
 
-  // Simple test route at root
-  app.get("/", (req, res) => {
-    res.json({ message: "Server is running" });
-  });
-
   // API Routes
   app.use("/api/v1", apiRoutes);
+
+  // Serve static files from the UI build directory
+  // From dist/server/server/ we need to go up 3 levels to reach project root, then ui/dist
+  const uiDistPath = path.join(__dirname, "..", "..", "..", "ui", "dist");
+  app.use(express.static(uiDistPath));
+
+  // Handle client-side routing - serve index.html for all non-API routes
+  app.use((req, res, next) => {
+    if (!req.path.startsWith("/api/") && !req.path.includes(".")) {
+      res.sendFile(path.join(uiDistPath, "index.html"));
+    } else {
+      next();
+    }
+  });
 
   // Start the server
   const port = config.server.port || 8080;
