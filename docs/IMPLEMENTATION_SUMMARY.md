@@ -6,29 +6,34 @@ This implementation successfully restructures the GitHub Event Router codebase t
 
 ## What Was Implemented
 
-### 1. Database Abstraction Layer (3 adapters)
+### 1. Database Abstraction Layer (2 adapters)
+
 **Files Created:**
+
 - `server/database/interface.ts` - Generic database interfaces
 - `server/database/sqlite.ts` - SQLite adapter (120+ LOC)
 - `server/database/postgres.ts` - PostgreSQL adapter (430+ LOC)
-- `server/database/mongodb.ts` - MongoDB adapter (470+ LOC)
 - `server/database/factory.ts` - Database factory (160+ LOC)
 - `server/database/index.ts` - Module exports
 
 **Migrations Created:**
-- `migrations/postgres/001_create_tables.sql`
-- `migrations/postgres/002_event_tracking.sql`
-- `migrations/mongodb/001_initialize.js`
+
+- `migrations/knex/001_create_tables.ts`
+- `migrations/knex/002_event_tracking.ts`
+- `migrations/knex/003_store_payload_headers.ts`
 
 **Features:**
+
 - Unified interface for all database operations
 - Support for transactions
 - Repository pattern for subscribers, transports, events, delivery attempts
 - Connection pooling (PostgreSQL)
-- Auto-incrementing IDs (MongoDB with counter collection)
+- Automatic migrations on startup via Knex
 
 ### 2. Internal Queue Layer (6 adapters)
+
 **Files Created:**
+
 - `server/queue/interface.ts` - Queue interfaces
 - `server/queue/memory.ts` - In-memory queue (170+ LOC)
 - `server/queue/redis.ts` - Redis Streams adapter (230+ LOC)
@@ -40,6 +45,7 @@ This implementation successfully restructures the GitHub Event Router codebase t
 - `server/queue/index.ts` - Module exports
 
 **Features:**
+
 - At-least-once delivery guarantees
 - Visibility timeout for message processing
 - Dead letter queue support
@@ -48,7 +54,9 @@ This implementation successfully restructures the GitHub Event Router codebase t
 - Message batching
 
 ### 3. Enhanced Transport Layer (6 transports)
+
 **Files Created:**
+
 - `server/transports/interface.ts` - Transport interfaces
 - `server/transports/https.ts` - HTTPS webhooks (110+ LOC)
 - `server/transports/redis.ts` - Redis Pub/Sub (90+ LOC)
@@ -60,6 +68,7 @@ This implementation successfully restructures the GitHub Event Router codebase t
 - `server/transports/index.ts` - Module exports
 
 **Features:**
+
 - Webhook signature generation (HTTPS)
 - Connection pooling for all transports
 - SSL/TLS support
@@ -68,13 +77,16 @@ This implementation successfully restructures the GitHub Event Router codebase t
 - Configurable error handling
 
 ### 4. Documentation (3 major documents)
+
 **Files Created:**
+
 - `docs/ARCHITECTURE.md` - Complete architecture overview (350+ lines)
 - `docs/CONFIGURATION.md` - Configuration examples (500+ lines)
 - `docs/KAFKA_FEASIBILITY.md` - Kafka analysis and recommendations (200+ lines)
 - `README.md` - Updated with new architecture (350+ lines)
 
 **Content:**
+
 - High-level architecture diagrams
 - Scalability characteristics and recommendations
 - Component descriptions and data flow
@@ -87,18 +99,21 @@ This implementation successfully restructures the GitHub Event Router codebase t
 ## Code Quality
 
 ### TypeScript Compilation
+
 - ✅ All code compiles with strict TypeScript settings
 - ✅ No compilation errors
 - ✅ Proper type safety with generics
 - ✅ Interface segregation principle applied
 
 ### Security
+
 - ✅ CodeQL analysis passed with 0 vulnerabilities
 - ✅ Encrypted storage of sensitive configuration
 - ✅ Proper authentication handling
 - ✅ No secrets in code
 
 ### Code Review
+
 - ✅ Code review completed
 - ✅ All feedback addressed
 - ✅ Consistent code style
@@ -107,6 +122,7 @@ This implementation successfully restructures the GitHub Event Router codebase t
 ## Statistics
 
 ### Code Added
+
 - **Total Files Created:** 34
 - **Total Lines of Code:** ~5,500+
 - **TypeScript Interfaces:** 15+
@@ -114,20 +130,22 @@ This implementation successfully restructures the GitHub Event Router codebase t
 - **Documentation Lines:** ~1,200+
 
 ### Dependencies Added
+
 ```json
 {
-  "pg": "^8.x",                    // PostgreSQL
-  "mongodb": "^6.x",               // MongoDB
-  "@aws-sdk/client-sqs": "^3.x",  // AWS SQS
-  "@azure/event-hubs": "^5.x",    // Azure Event Hub
-  "amqplib": "^0.10.x",           // RabbitMQ
-  "kafkajs": "^2.x"               // Apache Kafka
+  "pg": "^8.x", // PostgreSQL
+  "knex": "^3.x", // Database migrations
+  "@aws-sdk/client-sqs": "^3.x", // AWS SQS
+  "@azure/event-hubs": "^5.x", // Azure Event Hub
+  "amqplib": "^0.10.x", // RabbitMQ
+  "kafkajs": "^2.x" // Apache Kafka
 }
 ```
 
 ## Architecture Impact
 
 ### Before
+
 - Single SQLite database
 - In-memory queue only
 - 2 transport options (HTTPS, Redis)
@@ -136,7 +154,8 @@ This implementation successfully restructures the GitHub Event Router codebase t
 - Single point of failure
 
 ### After
-- 3 database options (SQLite, PostgreSQL, MongoDB)
+
+- 2 database options (SQLite, PostgreSQL)
 - 6 queue options (Memory, Redis, Kafka, SQS, Event Hub, AMQP)
 - 6 transport options (HTTPS, Redis, Kafka, SQS, Event Hub, AMQP)
 - Horizontal scaling via queue partitions
@@ -145,12 +164,12 @@ This implementation successfully restructures the GitHub Event Router codebase t
 
 ### Scalability Matrix
 
-| Environment | Events/Hour | Router Instances | Queue Partitions | Workers | Database |
-|-------------|-------------|------------------|------------------|---------|----------|
-| **Small** | <10k | 1-2 | 3 | 2-3 | SQLite |
-| **Medium** | 10k-100k | 3-6 | 6-12 | 6-12 | PostgreSQL |
-| **Large** | 100k-500k | 6-12 | 12-24 | 12-24 | PostgreSQL + replicas |
-| **Enterprise** | 500k+ | 12-24+ | 24+ | 24+ | PostgreSQL HA cluster |
+| Environment    | Events/Hour | Router Instances | Queue Partitions | Workers | Database              |
+| -------------- | ----------- | ---------------- | ---------------- | ------- | --------------------- |
+| **Small**      | <10k        | 1-2              | 3                | 2-3     | SQLite                |
+| **Medium**     | 10k-100k    | 3-6              | 6-12             | 6-12    | PostgreSQL            |
+| **Large**      | 100k-500k   | 6-12             | 12-24            | 12-24   | PostgreSQL + replicas |
+| **Enterprise** | 500k+       | 12-24+           | 24+              | 24+     | PostgreSQL HA cluster |
 
 ## Design Principles Applied
 

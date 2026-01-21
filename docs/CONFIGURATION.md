@@ -240,7 +240,7 @@ security:
   payload_size_limit_mb: 25
 ```
 
-## Azure Configuration with Event Hub and Cosmos DB
+## Azure Configuration with Event Hub and PostgreSQL
 
 ```yaml
 # config/azure.yaml
@@ -251,13 +251,13 @@ app:
   webhook_secret: ${GITHUB_WEBHOOK_SECRET}
 
 database:
-  type: mongodb
+  type: postgres
   encryption_key: ${DATABASE_ENCRYPTION_KEY}
-  host: ${COSMOS_DB_ENDPOINT}
+  host: ${AZURE_PG_HOST}
+  port: 5432
   database: github_events
-  # Cosmos DB connection string includes auth
-  username: ${COSMOS_DB_USERNAME}
-  password: ${COSMOS_DB_PASSWORD}
+  username: ${AZURE_PG_USERNAME}
+  password: ${AZURE_PG_PASSWORD}
 
 event_processing:
   queue:
@@ -411,6 +411,7 @@ security:
 ## Environment Variables
 
 ### Common Variables
+
 ```bash
 # GitHub Webhook Configuration
 export GITHUB_WEBHOOK_SECRET=your-webhook-secret
@@ -437,7 +438,7 @@ export COSMOS_DB_PASSWORD=your-cosmos-password
 ## Docker Compose Example
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   router:
@@ -499,40 +500,40 @@ spec:
         app: github-event-router
     spec:
       containers:
-      - name: router
-        image: github-event-router:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: NODE_ENV
-          value: "production"
-        - name: GITHUB_WEBHOOK_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: github-secrets
-              key: webhook-secret
-        - name: DATABASE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: password
-        - name: KAFKA_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: kafka-secrets
-              key: password
-        resources:
-          requests:
-            memory: "2Gi"
-            cpu: "1000m"
-          limits:
-            memory: "4Gi"
-            cpu: "2000m"
-        volumeMounts:
-        - name: config
-          mountPath: /app/config
+        - name: router
+          image: github-event-router:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: github-secrets
+                  key: webhook-secret
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: password
+            - name: KAFKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-secrets
+                  key: password
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
       volumes:
-      - name: config
-        configMap:
-          name: router-config
+        - name: config
+          configMap:
+            name: router-config
 ```

@@ -27,15 +27,6 @@ import {
   type PostgresConfig,
 } from "./postgres.js";
 
-import {
-  MongoDBDatabase,
-  MongoDBSubscriberRepository,
-  MongoDBTransportRepository,
-  MongoDBEventRepository,
-  MongoDBDeliveryAttemptRepository,
-  type MongoConfig,
-} from "./mongodb.js";
-
 export interface DatabaseRepositories {
   db: IDatabase;
   subscribers: ISubscriberRepository;
@@ -80,32 +71,6 @@ export class DatabaseFactory {
         break;
       }
 
-      case "mongodb": {
-        if (!config.host || !config.database) {
-          throw new Error("MongoDB requires host and database");
-        }
-
-        // Build MongoDB connection URL
-        let url = config.host;
-        if (!url.startsWith("mongodb://") && !url.startsWith("mongodb+srv://")) {
-          // Construct URL from parts
-          const auth =
-            config.username && config.password
-              ? `${config.username}:${config.password}@`
-              : "";
-          const port = config.port ? `:${config.port}` : "";
-          url = `mongodb://${auth}${config.host}${port}`;
-        }
-
-        const mongoConfig: MongoConfig = {
-          url,
-          database: config.database,
-        };
-
-        db = new MongoDBDatabase(mongoConfig);
-        break;
-      }
-
       default:
         throw new Error(`Unsupported database type: ${config.type}`);
     }
@@ -140,13 +105,6 @@ export class DatabaseFactory {
         transports = new PostgreSQLTransportRepository(db);
         events = new PostgreSQLEventRepository(db);
         deliveryAttempts = new PostgreSQLDeliveryAttemptRepository(db);
-        break;
-
-      case "mongodb":
-        subscribers = new MongoDBSubscriberRepository(db);
-        transports = new MongoDBTransportRepository(db);
-        events = new MongoDBEventRepository(db);
-        deliveryAttempts = new MongoDBDeliveryAttemptRepository(db);
         break;
 
       default:
