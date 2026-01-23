@@ -74,6 +74,7 @@ See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed design.
 
    ```sh
    npm install
+   cd ui && npm install && cd ..
    ```
 
 2. **Configure app:**
@@ -83,16 +84,27 @@ See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed design.
    # Edit local.yaml with your GitHub App credentials
    ```
 
-3. **Initialize database:**
+3. **Build the application:**
 
-   ```sh
-   npm run db:reset
-   ```
-
-4. **Build and run:**
    ```sh
    npm run build
+   ```
+
+4. **Start the server:**
+   ```sh
    npm start
+   ```
+   
+   The server will automatically:
+   - Run database migrations (creates database.sqlite if it doesn't exist)
+   - Initialize OpenTelemetry for observability
+   - Start the API server on port 8080
+   - Serve the Vue.js dashboard at http://localhost:8080
+   - Expose Prometheus metrics at http://localhost:9464/metrics
+
+5. **Development mode with hot reload:**
+   ```sh
+   npm run dev
    ```
 
 ### Production
@@ -236,6 +248,7 @@ See [Kafka Feasibility Analysis](docs/KAFKA_FEASIBILITY.md) for detailed recomme
 
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [Configuration Guide](docs/CONFIGURATION.md)
+- [Deployment Guide](docs/DEPLOYMENT.md) - How to deploy and scale in production
 - [Observability & Monitoring](docs/OBSERVABILITY.md)
 - [Kafka Feasibility Analysis](docs/KAFKA_FEASIBILITY.md)
 

@@ -8,6 +8,7 @@
     "node": ">= 22"
   },
   "scripts": {
+    "postinstall": "cd ui && npm install",
     "build": "npm run build:server && npm run build:ui",
     "build:server": "tsc",
     "build:ui": "cd ui && npm run build",

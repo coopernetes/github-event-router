@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { loadConfig, setAppConfig } from "./config.js";
 import { router as apiRoutes } from "./routes.js";
-import { setupWebhooks } from "./github.js";
+import { setupWebhooks, cleanupWebhooks } from "./github.js";
 import {
   initializeTelemetry,
   shutdownTelemetry,
@@ -14,7 +14,7 @@ import Database from "better-sqlite3";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function startServer() {
+export async function startServer() {
   // Initialize OpenTelemetry first
   initializeTelemetry();
 
@@ -53,14 +53,15 @@ export function startServer() {
       // Get active subscribers
       const subscribers = getSubscribers();
       return subscribers.filter(
-        (sub) => sub.transport && sub.transport.config && sub.events.length > 0
+        (sub) => sub.transport && sub.transport.config && sub.events.length > 0,
       ).length;
-    }
+    },
   );
 
   // Setup GitHub webhook handling BEFORE general JSON parsing
   // This ensures the webhook route gets raw body parsing
-  setupWebhooks(app);
+  // Note: setupWebhooks is now async to initialize the queue
+  await setupWebhooks(app);
 
   // Parse JSON for all other routes
   app.use(express.json());
@@ -85,13 +86,23 @@ export function startServer() {
   // Start the server
   const port = config.server.port || 8080;
   const server = app.listen(port, () => {
-    console.log(`Webhook Secret: ${config.app.webhook_secret.substring(0, 4)}...`);
+    console.log(
+      `Webhook Secret: ${config.app.webhook_secret.substring(0, 4)}...`,
+    );
     console.log(`Server is running on port ${port}`);
   });
 
   // Graceful shutdown handling
   const gracefulShutdown = async (signal: string) => {
     console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
+
+    // Cleanup webhook services (queue, workers)
+    try {
+      await cleanupWebhooks();
+      console.log("Webhook services cleanup complete");
+    } catch (error) {
+      console.error("Error cleaning up webhook services:", error);
+    }
 
     // Shutdown telemetry
     try {

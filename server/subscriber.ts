@@ -55,12 +55,20 @@ class SubscriberService {
     };
   }): Subscriber {
     // Ensure events is always an array
-    const events =
-      typeof raw.events === "string"
-        ? raw.events.split(",").map((e) => e.trim())
-        : Array.isArray(raw.events)
-          ? raw.events
-          : [];
+    let events: string[];
+    if (typeof raw.events === "string") {
+      // Try to parse as JSON first, fall back to comma-separated
+      try {
+        const parsed = JSON.parse(raw.events);
+        events = Array.isArray(parsed) ? parsed : [raw.events];
+      } catch {
+        events = raw.events.split(",").map((e) => e.trim());
+      }
+    } else if (Array.isArray(raw.events)) {
+      events = raw.events;
+    } else {
+      events = [];
+    }
 
     if (!raw.name || events.length === 0) {
       throw new Error("Invalid subscriber data: name and events are required");
@@ -123,7 +131,7 @@ class SubscriberService {
       // Get transport data
       const transportResult = this.db
         .prepare(
-          "SELECT id, name, config FROM transports WHERE subscriber_id = ?"
+          "SELECT id, name, config FROM transports WHERE subscriber_id = ?",
         )
         .get(subRow.id);
 
@@ -185,24 +193,24 @@ class SubscriberService {
   public createSubscriber(
     name: string,
     events: string[],
-    transport: Omit<ConfiguredTransport, "id">
+    transport: Omit<ConfiguredTransport, "id">,
   ): Subscriber {
     const result = this.db.transaction(() => {
       // Insert subscriber
       const subscriberStmt = this.db.prepare(
-        "INSERT INTO subscribers (name, events) VALUES (?, ?)"
+        "INSERT INTO subscribers (name, events) VALUES (?, ?)",
       );
       const subscriberResult = subscriberStmt.run(name, JSON.stringify(events));
       const subscriberId = subscriberResult.lastInsertRowid as number;
 
       // Insert transport
       const transportStmt = this.db.prepare(
-        "INSERT INTO transports (subscriber_id, name, config) VALUES (?, ?, ?)"
+        "INSERT INTO transports (subscriber_id, name, config) VALUES (?, ?, ?)",
       );
       const transportResult = transportStmt.run(
         subscriberId,
         transport.name,
-        JSON.stringify(transport.config)
+        JSON.stringify(transport.config),
       );
 
       return {
@@ -223,7 +231,7 @@ class SubscriberService {
 
   public updateSubscriber(
     id: number,
-    updates: Partial<Omit<Subscriber, "id">>
+    updates: Partial<Omit<Subscriber, "id">>,
   ): Subscriber {
     const result = this.db.transaction(() => {
       // Update subscriber details if provided
@@ -236,10 +244,8 @@ class SubscriberService {
         }
         if (updates.events) {
           sets.push("events = ?");
-          // Convert array to comma-separated string for database storage
-          const eventsString = Array.isArray(updates.events)
-            ? updates.events.join(",")
-            : updates.events;
+          // Store events as JSON for consistency
+          const eventsString = JSON.stringify(updates.events);
           params.push(eventsString);
         }
         params.push(id);
@@ -265,7 +271,7 @@ class SubscriberService {
           transportStmt.run(
             updates.transport.name,
             JSON.stringify(updates.transport.config),
-            id
+            id,
           );
         } else {
           // Insert new transport
@@ -276,7 +282,7 @@ class SubscriberService {
           transportStmt.run(
             id,
             updates.transport.name,
-            JSON.stringify(updates.transport.config)
+            JSON.stringify(updates.transport.config),
           );
         }
       }
@@ -287,7 +293,7 @@ class SubscriberService {
         .get(id) as Subscriber;
       const transportResult = this.db
         .prepare(
-          "SELECT id, name, config FROM transports WHERE subscriber_id = ?"
+          "SELECT id, name, config FROM transports WHERE subscriber_id = ?",
         )
         .get(id) as TransportRow | undefined;
 
@@ -325,18 +331,18 @@ export const getSubscribers = () => {
 export const createSubscriber = (
   name: string,
   events: string[],
-  transport: Omit<ConfiguredTransport, "id">
+  transport: Omit<ConfiguredTransport, "id">,
 ) => {
   return SubscriberService.getInstance().createSubscriber(
     name,
     events,
-    transport
+    transport,
   );
 };
 
 export const updateSubscriber = (
   id: number,
-  updates: Partial<Omit<Subscriber, "id">>
+  updates: Partial<Omit<Subscriber, "id">>,
 ) => {
   return SubscriberService.getInstance().updateSubscriber(id, updates);
 };

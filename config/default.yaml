@@ -8,6 +8,39 @@ database:
   type: sqlite
   filename: ./database.sqlite
 
+# Internal queue for decoupling webhook receiver from event processing
+# When enabled, events are queued for async processing which provides:
+# - Better resilience (events persist if process crashes)
+# - Horizontal scaling (multiple workers can process from same queue)
+# - Back-pressure handling (receiver can quickly ACK to GitHub)
+internal_queue:
+  enabled: false  # Set to true to enable queue-based processing
+  type: memory    # memory, redis, kafka, amqp, sqs, azure-eventhub
+  consumer_count: 1
+  poll_interval_ms: 100
+  visibility_timeout_ms: 30000
+  
+  # Redis configuration (when type: redis)
+  # redis:
+  #   url: redis://localhost:6379
+  #   password: ""
+  #   stream_name: github-events
+  #   consumer_group: event-workers
+  
+  # Kafka configuration (when type: kafka)
+  # kafka:
+  #   brokers:
+  #     - localhost:9092
+  #   topic: github-events
+  #   client_id: github-event-router
+  #   group_id: event-workers
+  
+  # AMQP/RabbitMQ configuration (when type: amqp)
+  # amqp:
+  #   url: amqp://localhost:5672
+  #   queue_name: github-events
+  #   exchange: github-events
+
 event_processing:
   retry:
     max_attempts: 3

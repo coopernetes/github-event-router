@@ -26,16 +26,20 @@ export class HttpsTransport implements ITransport {
   validateConfig(config: unknown): config is HttpsTransportConfig {
     if (!config || typeof config !== "object") return false;
     const httpConfig = config as HttpsTransportConfig;
-    return (
+
+    // Allow http://localhost for local development, require https otherwise
+    const isValidUrl =
       typeof httpConfig.url === "string" &&
-      typeof httpConfig.webhook_secret === "string" &&
-      httpConfig.url.startsWith("https://")
-    );
+      (httpConfig.url.startsWith("https://") ||
+        httpConfig.url.startsWith("http://localhost:") ||
+        httpConfig.url.startsWith("http://127.0.0.1:"));
+
+    return isValidUrl && typeof httpConfig.webhook_secret === "string";
   }
 
   async deliver(
     event: GitHubEvent,
-    transportConfig: TransportConfig
+    transportConfig: TransportConfig,
   ): Promise<DeliveryResult> {
     const startTime = Date.now();
     const httpsConfig = transportConfig as HttpsTransportConfig;
@@ -47,7 +51,7 @@ export class HttpsTransport implements ITransport {
       // Generate signature for subscriber (GitHub webhook format)
       const signature = this.generateSignature(
         payloadString,
-        httpsConfig.webhook_secret
+        httpsConfig.webhook_secret,
       );
 
       // Prepare headers
@@ -99,7 +103,7 @@ export class HttpsTransport implements ITransport {
    * Generate GitHub webhook signature (SHA-256 HMAC)
    * Format matches GitHub's webhook signature: "sha256=<hex_digest>"
    * This is compatible with @octokit/webhooks and GitHub's native webhook format
-   * 
+   *
    * @see https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
    */
   private generateSignature(payload: string, secret: string): string {

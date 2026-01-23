@@ -1,4 +1,5 @@
 import config from "config";
+import type { QueueType } from "./queue/factory.js";
 
 export interface Config {
   server: {
@@ -9,6 +10,7 @@ export interface Config {
   };
   database: DatabaseConfig | undefined;
   event_processing: EventProcessingConfig;
+  internal_queue: InternalQueueConfig;
   monitoring: MonitoringConfig;
   security: SecurityConfig;
 }
@@ -32,6 +34,47 @@ export interface RetryConfig {
   initial_delay_ms: number;
   max_delay_ms: number;
   retryable_status_codes: number[];
+}
+
+export interface InternalQueueConfig {
+  enabled: boolean;
+  type: QueueType;
+  consumer_count: number;
+  poll_interval_ms: number;
+  visibility_timeout_ms: number;
+  // Redis-specific
+  redis?: {
+    url: string;
+    password?: string;
+    stream_name?: string;
+    consumer_group?: string;
+  };
+  // Kafka-specific
+  kafka?: {
+    brokers: string[];
+    topic: string;
+    client_id?: string;
+    group_id?: string;
+  };
+  // AMQP-specific
+  amqp?: {
+    url: string;
+    queue_name?: string;
+    exchange?: string;
+  };
+  // SQS-specific
+  sqs?: {
+    region: string;
+    queue_url: string;
+    access_key_id?: string;
+    secret_access_key?: string;
+  };
+  // Azure Event Hub-specific
+  azure_eventhub?: {
+    connection_string: string;
+    event_hub_name: string;
+    consumer_group?: string;
+  };
 }
 
 export interface EventProcessingConfig {
@@ -73,6 +116,21 @@ export function getAppConfig(): Config {
 }
 
 export function loadConfig(): Config {
+  // Load internal_queue config with defaults
+  let internalQueueConfig: InternalQueueConfig;
+  try {
+    internalQueueConfig = config.get("internal_queue");
+  } catch {
+    // Default to disabled (synchronous processing) if not configured
+    internalQueueConfig = {
+      enabled: false,
+      type: "memory",
+      consumer_count: 1,
+      poll_interval_ms: 100,
+      visibility_timeout_ms: 30000,
+    };
+  }
+
   return {
     server: {
       port: config.get("server.port"),
@@ -82,6 +140,7 @@ export function loadConfig(): Config {
     },
     database: config.get("database"),
     event_processing: config.get("event_processing"),
+    internal_queue: internalQueueConfig,
     monitoring: config.get("monitoring"),
     security: config.get("security"),
   };

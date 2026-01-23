@@ -3,7 +3,12 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
-import type { Meter, Counter, Histogram, ObservableGauge } from "@opentelemetry/api";
+import type {
+  Meter,
+  Counter,
+  Histogram,
+  ObservableGauge,
+} from "@opentelemetry/api";
 import { metrics } from "@opentelemetry/api";
 
 // Prometheus exporter configuration
@@ -12,8 +17,10 @@ const prometheusExporter = new PrometheusExporter(
     port: 9464, // Standard Prometheus port
   },
   () => {
-    console.log("Prometheus scrape endpoint available at http://localhost:9464/metrics");
-  }
+    console.log(
+      "Prometheus scrape endpoint available at http://localhost:9464/metrics",
+    );
+  },
 );
 
 // OpenTelemetry SDK configuration
@@ -36,7 +43,10 @@ export function initializeTelemetry(): void {
       new HttpInstrumentation({
         requestHook: (span, request) => {
           // Add custom attributes to HTTP spans
-          span.setAttribute("http.route", (request as { route?: { path: string } }).route?.path || "unknown");
+          span.setAttribute(
+            "http.route",
+            (request as { route?: { path: string } }).route?.path || "unknown",
+          );
         },
       }),
       new ExpressInstrumentation(),
@@ -67,6 +77,7 @@ export interface AppMetrics {
   activeSubscribers: ObservableGauge;
   databaseLatency: Histogram;
   transportDeliveryDuration: Histogram;
+  eventsQueued?: Counter;
 }
 
 let appMetrics: AppMetrics | null = null;
@@ -74,11 +85,16 @@ let appMetrics: AppMetrics | null = null;
 export function createAppMetrics(
   getQueueDepth: () => number,
   getRetryQueueDepth: () => number,
-  getActiveSubscribers: () => number
+  getActiveSubscribers: () => number,
 ): AppMetrics {
   const meter: Meter = metrics.getMeter("github-event-router");
 
   appMetrics = {
+    // Counter: Events queued for async processing (optional, only if queue enabled)
+    eventsQueued: meter.createCounter("events_queued", {
+      description: "Number of events queued for async processing",
+      unit: "1",
+    }),
     // Counter: Total webhook events received
     webhookEventsReceived: meter.createCounter("webhook_events_received", {
       description: "Total number of webhook events received from GitHub",
@@ -97,7 +113,7 @@ export function createAppMetrics(
       {
         description: "Duration of event processing in milliseconds",
         unit: "ms",
-      }
+      },
     ),
 
     // Counter: Total delivery attempts
@@ -146,9 +162,10 @@ export function createAppMetrics(
     transportDeliveryDuration: meter.createHistogram(
       "transport_delivery_duration",
       {
-        description: "Duration of transport delivery operations in milliseconds",
+        description:
+          "Duration of transport delivery operations in milliseconds",
         unit: "ms",
-      }
+      },
     ),
   };
 
@@ -171,7 +188,7 @@ export function createAppMetrics(
 export function getAppMetrics(): AppMetrics {
   if (!appMetrics) {
     throw new Error(
-      "App metrics not initialized. Call createAppMetrics() first."
+      "App metrics not initialized. Call createAppMetrics() first.",
     );
   }
   return appMetrics;
