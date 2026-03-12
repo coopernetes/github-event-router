@@ -1,4 +1,25 @@
 import Database, { type Database as DatabaseType } from "better-sqlite3";
+import type {
+  TransportName,
+  TransportConfig,
+  HttpsTransportConfig,
+  RedisTransportConfig,
+  KafkaTransportConfig,
+  SQSTransportConfig,
+  AzureEventHubTransportConfig,
+  AMQPTransportConfig,
+} from "./transports/interface.js";
+
+export type {
+  TransportName,
+  TransportConfig,
+  HttpsTransportConfig,
+  RedisTransportConfig,
+  KafkaTransportConfig,
+  SQSTransportConfig,
+  AzureEventHubTransportConfig,
+  AMQPTransportConfig,
+};
 
 export interface Subscriber {
   id: number;
@@ -6,8 +27,6 @@ export interface Subscriber {
   events: string[];
   transport: ConfiguredTransport | undefined;
 }
-
-export type TransportName = "https" | "redis";
 
 export interface Transport {
   id: number;
@@ -21,18 +40,6 @@ export type ConfiguredTransport = Transport & {
 export type TransportRow = Transport & {
   config: string; // JSON string
 };
-
-export interface HttpsTransportConfig {
-  url: string;
-  webhook_secret: string;
-}
-
-export interface RedisTransportConfig {
-  url: string;
-  password: string;
-}
-
-export type TransportConfig = HttpsTransportConfig | RedisTransportConfig;
 
 class SubscriberService {
   private static _instance: SubscriberService;
@@ -77,7 +84,18 @@ class SubscriberService {
     // Normalize transport name (convert 'http' to 'https')
     const transportName =
       raw.transport?.name === "http" ? "https" : raw.transport?.name;
-    if (transportName && !["https", "redis"].includes(transportName)) {
+    const validTransportTypes: TransportName[] = [
+      "https",
+      "redis",
+      "kafka",
+      "sqs",
+      "azure-eventhub",
+      "amqp",
+    ];
+    if (
+      transportName &&
+      !validTransportTypes.includes(transportName as TransportName)
+    ) {
       throw new Error(`Invalid transport type: ${transportName}`);
     }
 
@@ -184,10 +202,7 @@ class SubscriberService {
   }
 
   private configType(raw: Record<string, string>): TransportConfig {
-    if (Object.keys(raw).includes("webhook_secret")) {
-      return raw as unknown as HttpsTransportConfig;
-    }
-    return raw as unknown as RedisTransportConfig;
+    return raw as unknown as TransportConfig;
   }
 
   public createSubscriber(

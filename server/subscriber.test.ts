@@ -40,8 +40,20 @@ describe("Subscriber", () => {
   });
 
   test("validates transport type", () => {
-    // Only 'https' and 'redis' are valid transport types
-    expect(["https", "redis"]).toContain("https");
-    expect(["https", "redis"]).toContain("redis");
+    // All 6 documented transport types should be valid
+    const validTypes = [
+      "https",
+      "redis",
+      "kafka",
+      "sqs",
+      "azure-eventhub",
+      "amqp",
+    ];
+    expect(validTypes).toContain("https");
+    expect(validTypes).toContain("redis");
+    expect(validTypes).toContain("kafka");
+    expect(validTypes).toContain("sqs");
+    expect(validTypes).toContain("azure-eventhub");
+    expect(validTypes).toContain("amqp");
   });
 });
