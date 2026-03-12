@@ -9,6 +9,7 @@ import type {
   AzureEventHubTransportConfig,
   AMQPTransportConfig,
 } from "./transports/interface.js";
+import { TRANSPORT_NAMES } from "./transports/interface.js";
 
 export type {
   TransportName,
@@ -84,17 +85,9 @@ class SubscriberService {
     // Normalize transport name (convert 'http' to 'https')
     const transportName =
       raw.transport?.name === "http" ? "https" : raw.transport?.name;
-    const validTransportTypes: TransportName[] = [
-      "https",
-      "redis",
-      "kafka",
-      "sqs",
-      "azure-eventhub",
-      "amqp",
-    ];
     if (
       transportName &&
-      !validTransportTypes.includes(transportName as TransportName)
+      !TRANSPORT_NAMES.includes(transportName as TransportName)
     ) {
       throw new Error(`Invalid transport type: ${transportName}`);
     }

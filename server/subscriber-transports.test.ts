@@ -283,4 +283,3 @@ describe("Subscriber Transport Types - Functional", () => {
     expect(normalized).toBe("https");
   });
 });
-

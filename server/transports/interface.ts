@@ -105,10 +105,13 @@ export type TransportConfig =
   | AzureEventHubTransportConfig
   | AMQPTransportConfig;
 
-export type TransportName =
-  | "https"
-  | "redis"
-  | "kafka"
-  | "sqs"
-  | "azure-eventhub"
-  | "amqp";
+export const TRANSPORT_NAMES = [
+  "https",
+  "redis",
+  "kafka",
+  "sqs",
+  "azure-eventhub",
+  "amqp",
+] as const;
+
+export type TransportName = (typeof TRANSPORT_NAMES)[number];
