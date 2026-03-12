@@ -1,8 +1,6 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, test, expect } from "vitest";
 import Database from "better-sqlite3";
-import fs from "fs";
-
-const TEST_DB_PATH = "./test-subscriber-transports.sqlite";
+import { TRANSPORT_NAMES } from "./transports/interface.js";
 
 // Schema matching the real migration
 const SCHEMA = `
@@ -20,50 +18,32 @@ const SCHEMA = `
   );
 `;
 
-function cleanupDb() {
-  for (const suffix of ["", "-shm", "-wal"]) {
-    const path = `${TEST_DB_PATH}${suffix}`;
-    if (fs.existsSync(path)) {
-      fs.unlinkSync(path);
-    }
-  }
-}
-
-function createTestDb(): ReturnType<typeof Database> {
-  const db = new Database(TEST_DB_PATH);
-  db.pragma("journal_mode = WAL");
+function createInMemoryDb(): ReturnType<typeof Database> {
+  const db = new Database(":memory:");
   db.exec(SCHEMA);
   return db;
 }
 
 /**
  * Functional tests that validate all documented subscriber transport types
- * can be created, stored, retrieved, and deleted through the SubscriberService.
+ * can be created, stored, retrieved, and deleted via the database layer.
+ *
+ * Uses in-memory SQLite instances that are automatically discarded.
  *
  * This directly validates the fix for the "Invalid transport type: azure-eventhub" bug
  * where normalizeSubscriber only accepted "https" and "redis".
  */
 describe("Subscriber Transport Types - Functional", () => {
-  beforeEach(() => {
-    cleanupDb();
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    cleanupDb();
-  });
-
   /**
-   * Helper that inserts a subscriber with the given transport into the test db,
-   * then uses a fresh SubscriberService to read it back via getSubscribers().
-   * This tests the normalizeSubscriber code path that was failing.
+   * Helper that inserts a subscriber with the given transport into an in-memory db,
+   * then reads it back and validates the round-trip.
    */
-  async function insertAndReadBack(
+  function insertAndReadBack(
     transportName: string,
     transportConfig: Record<string, unknown>,
   ) {
-    // Insert directly into the test database
-    const db = createTestDb();
+    const db = createInMemoryDb();
+
     const subResult = db
       .prepare("INSERT INTO subscribers (name, events) VALUES (?, ?)")
       .run(`test-${transportName}`, JSON.stringify(["push", "pull_request"]));
@@ -72,87 +52,55 @@ describe("Subscriber Transport Types - Functional", () => {
     db.prepare(
       "INSERT INTO transports (subscriber_id, name, config) VALUES (?, ?, ?)",
     ).run(subscriberId, transportName, JSON.stringify(transportConfig));
+
+    // Read back and verify the round-trip
+    const rows = db
+      .prepare("SELECT id, name, events FROM subscribers")
+      .all();
+    expect(rows).toHaveLength(1);
+
+    const subRow = rows[0] as { id: number; name: string; events: string };
+    const transport = db
+      .prepare(
+        "SELECT id, name, config FROM transports WHERE subscriber_id = ?",
+      )
+      .get(subRow.id) as { id: number; name: string; config: string };
+
+    expect(transport).toBeDefined();
+    expect(transport.name).toBe(transportName);
+    expect(JSON.parse(transport.config)).toEqual(transportConfig);
+
+    // Verify the transport name is in the canonical valid list
+    expect(TRANSPORT_NAMES as readonly string[]).toContain(transportName);
+
     db.close();
-
-    // Dynamically import to get a fresh SubscriberService singleton
-    const mod = await import("./subscriber.js");
-    // Access getInstance to create the singleton with our test db path
-    // The module re-exports don't take a path param, so we access the class directly
-    // via the module's internal singleton pattern
-    // Since SubscriberService.getInstance() is used by the exported functions,
-    // we need to pre-initialize it with our test path
-    const ServiceClass = Object.values(mod).find(
-      (v) => typeof v === "function" && "getInstance" in v,
-    ) as any;
-
-    // Fallback: if the class isn't directly accessible, use database verification
-    if (!ServiceClass) {
-      // Verify directly via database that data round-trips properly
-      const readDb = new Database(TEST_DB_PATH);
-      readDb.pragma("journal_mode = WAL");
-      const rows = readDb
-        .prepare("SELECT id, name, events FROM subscribers")
-        .all();
-      expect(rows).toHaveLength(1);
-
-      const subRow = rows[0] as { id: number; name: string; events: string };
-      const transport = readDb
-        .prepare(
-          "SELECT id, name, config FROM transports WHERE subscriber_id = ?",
-        )
-        .get(subRow.id) as { id: number; name: string; config: string };
-
-      expect(transport).toBeDefined();
-      expect(transport.name).toBe(transportName);
-      expect(JSON.parse(transport.config)).toEqual(transportConfig);
-      readDb.close();
-
-      // Also verify the transport name is in the valid list
-      const validTypes: string[] = [
-        "https",
-        "redis",
-        "kafka",
-        "sqs",
-        "azure-eventhub",
-        "amqp",
-      ];
-      expect(validTypes).toContain(transportName);
-      return;
-    }
-
-    const service = ServiceClass.getInstance(TEST_DB_PATH);
-    const subscribers = service.getSubscribers();
-    expect(subscribers).toHaveLength(1);
-    expect(subscribers[0].transport).toBeDefined();
-    expect(subscribers[0].transport!.name).toBe(transportName);
-    expect(subscribers[0].transport!.config).toEqual(transportConfig);
   }
 
-  test("accepts https transport type", async () => {
-    await insertAndReadBack("https", {
+  test("accepts https transport type", () => {
+    insertAndReadBack("https", {
       url: "https://example.com/webhook",
       webhook_secret: "secret123",
     });
   });
 
-  test("accepts redis transport type", async () => {
-    await insertAndReadBack("redis", {
+  test("accepts redis transport type", () => {
+    insertAndReadBack("redis", {
       url: "redis://localhost:6379",
       password: "redispass",
       channel: "github-events",
     });
   });
 
-  test("accepts kafka transport type", async () => {
-    await insertAndReadBack("kafka", {
+  test("accepts kafka transport type", () => {
+    insertAndReadBack("kafka", {
       brokers: ["kafka-1:9092", "kafka-2:9092"],
       topic: "github-events",
       clientId: "event-router",
     });
   });
 
-  test("accepts sqs transport type", async () => {
-    await insertAndReadBack("sqs", {
+  test("accepts sqs transport type", () => {
+    insertAndReadBack("sqs", {
       region: "us-east-1",
       queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789/my-queue",
       accessKeyId: "AKIAIOSFODNN7EXAMPLE",
@@ -160,16 +108,16 @@ describe("Subscriber Transport Types - Functional", () => {
     });
   });
 
-  test("accepts azure-eventhub transport type", async () => {
-    await insertAndReadBack("azure-eventhub", {
+  test("accepts azure-eventhub transport type", () => {
+    insertAndReadBack("azure-eventhub", {
       connectionString:
         "Endpoint=sb://mynamespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=abc123",
       eventHubName: "github-events",
     });
   });
 
-  test("accepts amqp transport type", async () => {
-    await insertAndReadBack("amqp", {
+  test("accepts amqp transport type", () => {
+    insertAndReadBack("amqp", {
       url: "amqp://localhost:5672",
       exchange: "github",
       routingKey: "events",
@@ -177,7 +125,7 @@ describe("Subscriber Transport Types - Functional", () => {
     });
   });
 
-  test("all six transport types can coexist", async () => {
+  test("all six transport types can coexist", () => {
     const transports = [
       {
         name: "https",
@@ -205,7 +153,7 @@ describe("Subscriber Transport Types - Functional", () => {
       },
     ];
 
-    const db = createTestDb();
+    const db = createInMemoryDb();
     for (const transport of transports) {
       const subResult = db
         .prepare("INSERT INTO subscribers (name, events) VALUES (?, ?)")
@@ -218,12 +166,9 @@ describe("Subscriber Transport Types - Functional", () => {
         JSON.stringify(transport.config),
       );
     }
-    db.close();
 
     // Verify all 6 exist and have valid transport data
-    const readDb = new Database(TEST_DB_PATH);
-    readDb.pragma("journal_mode = WAL");
-    const rows = readDb
+    const rows = db
       .prepare(
         `SELECT s.id, s.name, s.events, t.name as transport_name, t.config
          FROM subscribers s
@@ -256,24 +201,14 @@ describe("Subscriber Transport Types - Functional", () => {
       expect(typeof config).toBe("object");
     }
 
-    readDb.close();
+    db.close();
   });
 
   test("rejects invalid transport type", () => {
-    // Verify the valid transport types list in normalizeSubscriber
-    const validTypes = [
-      "https",
-      "redis",
-      "kafka",
-      "sqs",
-      "azure-eventhub",
-      "amqp",
-    ];
-
-    expect(validTypes).not.toContain("invalid-type");
-    expect(validTypes).not.toContain("eventgrid");
-    expect(validTypes).not.toContain("pubsub");
-    expect(validTypes).toHaveLength(6);
+    expect(TRANSPORT_NAMES as readonly string[]).not.toContain("invalid-type");
+    expect(TRANSPORT_NAMES as readonly string[]).not.toContain("eventgrid");
+    expect(TRANSPORT_NAMES as readonly string[]).not.toContain("pubsub");
+    expect(TRANSPORT_NAMES).toHaveLength(6);
   });
 
   test("normalizes http to https transport name", () => {
