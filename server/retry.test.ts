@@ -23,7 +23,8 @@ describe("RetryHandler", () => {
         success: false,
         statusCode: 503,
         error: "Service unavailable",
-        timestamp: new Date(),
+        durationMs: 100,
+        attempt: 1,
       };
       const context = {
         subscriberId: 1,
